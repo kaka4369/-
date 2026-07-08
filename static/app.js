@@ -150,6 +150,7 @@
   let savingInFlight = null;
   let spaceDown = false;
   let activeDrag = null;
+  let suppressNextMediaPreviewClick = false;
 
   function blankState() {
     return {
@@ -662,10 +663,10 @@
     if (kind === 'video' || node.type === 'video') {
       return `<video class="node-media${compact ? ' compact' : ''}" src="${safe}" controls></video>`;
     }
-    if (compact) return `<img class="node-media compact" src="${safe}" alt="asset" loading="lazy" />`;
+    if (compact) return `<img class="node-media compact" src="${safe}" alt="asset" loading="lazy" draggable="false" />`;
     return `
-      <button class="node-media-preview" type="button" data-preview-media="${safe}" aria-label="查看完整图片">
-        <img class="node-media" src="${safe}" alt="asset" loading="lazy" />
+      <button class="node-media-preview" type="button" data-preview-media="${safe}" aria-label="查看完整图片" draggable="false">
+        <img class="node-media" src="${safe}" alt="asset" loading="lazy" draggable="false" />
       </button>
     `;
   }
@@ -755,6 +756,14 @@
     element.querySelector('.node-resize').addEventListener('pointerdown', (event) => startNodeResize(event, node));
     element.querySelector('.node-port.output').addEventListener('pointerdown', (event) => startEdgeDrag(event, node));
     element.querySelector('.node-port.input').addEventListener('pointerup', (event) => finishEdgeDrag(event, node));
+    if (node.type === 'image') {
+      element.querySelector('.node-media-preview')?.addEventListener('pointerdown', (event) => {
+        startNodeDrag(event, node, false, {
+          allowInteractive: true,
+          previewUrl: event.currentTarget.dataset.previewMedia || ''
+        });
+      });
+    }
     bindNodeControls(element, node);
     els.nodeLayer.appendChild(element);
   }
@@ -1097,8 +1106,9 @@
     });
   }
 
-  function startNodeDrag(event, node, includeGroupChildren) {
-    if (event.button !== 0 || event.target.closest('input,textarea,button,select,video,.node-port')) return;
+  function startNodeDrag(event, node, includeGroupChildren, options = {}) {
+    if (event.button !== 0) return;
+    if (!options.allowInteractive && event.target.closest('input,textarea,button,select,video,.node-port')) return;
     event.preventDefault();
     event.stopPropagation();
     if (event.shiftKey) toggleSelect(node.id);
@@ -1110,6 +1120,9 @@
     activeDrag = {
       kind: 'node',
       start: clientToWorld(event.clientX, event.clientY),
+      clientStart: { x: event.clientX, y: event.clientY },
+      moved: false,
+      previewUrl: options.previewUrl || '',
       origins: [...movedNodes.values()].map((item) => ({ id: item.id, x: item.x, y: item.y }))
     };
     window.addEventListener('pointermove', onPointerMove);
@@ -1182,6 +1195,9 @@
       const point = clientToWorld(event.clientX, event.clientY);
       const dx = point.x - activeDrag.start.x;
       const dy = point.y - activeDrag.start.y;
+      const clientDx = Math.abs(event.clientX - activeDrag.clientStart.x);
+      const clientDy = Math.abs(event.clientY - activeDrag.clientStart.y);
+      if (clientDx + clientDy > 4) activeDrag.moved = true;
       activeDrag.origins.forEach((origin) => {
         const node = nodeById(origin.id);
         if (!node) return;
@@ -1234,6 +1250,10 @@
         .map((node) => node.id);
       selectMany(ids);
       els.selectionBox.classList.add('hidden');
+    }
+    if (finished.kind === 'node' && finished.previewUrl) {
+      suppressNextMediaPreviewClick = true;
+      if (!finished.moved) openMediaPreview(finished.previewUrl);
     }
     if (finished.kind !== 'marquee') {
       renderInspector();
@@ -2367,6 +2387,10 @@
       if (!trigger) return;
       event.preventDefault();
       event.stopPropagation();
+      if (suppressNextMediaPreviewClick) {
+        suppressNextMediaPreviewClick = false;
+        return;
+      }
       openMediaPreview(trigger.dataset.previewMedia || '');
     });
     els.mediaPreviewModal.querySelectorAll('[data-preview-close]').forEach((button) => {

@@ -176,6 +176,19 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("height: auto", css)
         self.assertIn(".media-preview-modal", css)
 
+    def test_image_preview_drags_node_instead_of_native_image(self):
+        css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
+        js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn('draggable="false"', js)
+        self.assertIn("allowInteractive: true", js)
+        self.assertIn("previewUrl: event.currentTarget.dataset.previewMedia || ''", js)
+        self.assertIn("suppressNextMediaPreviewClick", js)
+        self.assertIn("if (!finished.moved) openMediaPreview(finished.previewUrl)", js)
+        self.assertIn("-webkit-user-drag: none", css)
+        self.assertIn("cursor: grab", css)
+        self.assertIn("cursor: grabbing", css)
+
     def test_image_nodes_expose_ratio_size_and_scale_controls_without_quality(self):
         js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
         css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
