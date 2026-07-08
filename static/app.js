@@ -47,7 +47,10 @@
     imageModels: ['gpt-image-2', 'gemini-3.1-flash-image'],
     videoProviders: ['灵境API', '火山引擎', '自定义'],
     videoModels: ['seedance-2.0', 'seedance-2.0-1080', 'seedance-2.0-vision-1080', 'veo3.1-fast'],
-    ratios: ['1:1', '3:4', '4:3', '9:16', '16:9', '21:9'],
+    ratios: ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'],
+    imageSizes: ['自适应', '1K', '2K', '4K'],
+    imageQualities: ['标准画质', '高清', '超清'],
+    imageScales: ['1', '2', '4'],
     resolutions: ['Auto', '720p', '1080p'],
     qualities: ['auto', 'low', 'medium', 'high']
   };
@@ -228,7 +231,9 @@
         apiProvider: nodePresets.imageProviders[0],
         model: nodePresets.imageModels[0],
         ratio: '1:1',
-        quality: 'auto',
+        imageSize: '自适应',
+        imageQuality: '标准画质',
+        imageScale: '1',
         count: 1
       };
     }
@@ -280,6 +285,12 @@
       progressStartedAt: safeNumber(source.progressStartedAt, 0)
     };
     if (type === 'group') node.children = Array.isArray(source.children) ? source.children.slice() : [];
+    if (type === 'image') {
+      const legacyQuality = { auto: '标准画质', low: '标准画质', medium: '高清', high: '超清' };
+      node.imageSize = node.imageSize || '自适应';
+      node.imageQuality = node.imageQuality || legacyQuality[source.quality] || '标准画质';
+      node.imageScale = String(node.imageScale || '1');
+    }
     if (type === 'output' && !Array.isArray(node.outputItems)) node.outputItems = [];
     return node;
   }
@@ -870,6 +881,7 @@
   }
 
   function imageNodeHtml(node) {
+    const imageScale = String(node.imageScale || '1');
     return `
       ${nodeStageHtml(node, 'image', '图片未生成', '输入提示词、上传参考图，或连接上游节点。')}
       <section class="node-console">
@@ -885,10 +897,16 @@
         <div class="node-bottom-bar image-bottom-bar">
           <select data-field="apiProvider">${optionHtml(nodePresets.imageProviders, node.apiProvider)}</select>
           <select data-field="model">${optionHtml(nodePresets.imageModels, node.model)}</select>
-          <select data-field="ratio">${optionHtml(nodePresets.ratios, node.ratio)}</select>
-          <select data-field="quality">${optionHtml(nodePresets.qualities, node.quality)}</select>
-          <input data-field="count" type="number" min="1" max="8" value="${escapeHtml(node.count || 1)}">
           ${consoleRunButtonHtml('生成图片')}
+        </div>
+        <div class="image-option-grid">
+          <label><span>比例</span><select data-field="ratio">${optionHtml(nodePresets.ratios, node.ratio)}</select></label>
+          <label><span>尺寸</span><select data-field="imageSize">${optionHtml(nodePresets.imageSizes, node.imageSize)}</select></label>
+          <label><span>画质</span><select data-field="imageQuality">${optionHtml(nodePresets.imageQualities, node.imageQuality)}</select></label>
+          <label><span>张数</span><input data-field="count" type="number" min="1" max="8" value="${escapeHtml(node.count || 1)}"></label>
+          <div class="image-scale-group" aria-label="倍率">
+            ${nodePresets.imageScales.map((scale) => chipHtml(scale, `${scale}x`, imageScale === scale, 'imageScale')).join('')}
+          </div>
         </div>
       </section>
     `;
@@ -1470,7 +1488,7 @@
 
   function taskParams(node) {
     if (node.type === 'image') {
-      return `# Params\nprovider=${node.apiProvider}; model=${node.model}; ratio=${node.ratio}; quality=${node.quality}; count=${node.count || 1}`;
+      return `# Params\nprovider=${node.apiProvider}; model=${node.model}; ratio=${node.ratio}; image_size=${node.imageSize}; image_quality=${node.imageQuality}; image_scale=${node.imageScale || 1}; count=${node.count || 1}`;
     }
     if (node.type === 'video') {
       return `# Params\nprovider=${node.apiProvider}; model=${node.model}; mode=${node.videoMode}; duration=${node.duration}; aspect=${node.aspectRatio}; resolution=${node.resolution}; output_fps=${node.outputFps || 0}; enhance_prompt=${!!node.enhancePrompt}; fixed_camera=${!!node.cameraFixed}; audio=${!!node.generateAudio}`;
