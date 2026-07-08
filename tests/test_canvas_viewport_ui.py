@@ -85,7 +85,7 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("flex-direction: column", css)
         self.assertIn("flex: 1 1", css)
 
-    def test_image_nodes_expose_ratio_size_quality_and_scale_controls(self):
+    def test_image_nodes_expose_ratio_size_and_scale_controls_without_quality(self):
         js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
         css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
 
@@ -93,21 +93,35 @@ class CanvasViewportUiTests(unittest.TestCase):
             self.assertIn(f"'{ratio}'", js)
         for image_size in ["自适应", "1K", "2K", "4K"]:
             self.assertIn(f"'{image_size}'", js)
-        for quality in ["标准画质", "高清", "超清"]:
-            self.assertIn(f"'{quality}'", js)
 
         self.assertIn("imageSize", js)
         self.assertIn("imageScale", js)
         self.assertIn("data-field=\"imageSize\"", js)
-        self.assertIn("data-field=\"imageQuality\"", js)
         self.assertIn("data-chip-field=\"${escapeHtml(field)}\"", js)
         self.assertIn("'imageScale'", js)
         self.assertIn("image_size=${node.imageSize}", js)
-        self.assertIn("image_quality=${node.imageQuality}", js)
         self.assertIn("image_scale=${node.imageScale", js)
+        self.assertNotIn("imageQuality", js)
+        self.assertNotIn("image_quality", js)
+        self.assertNotIn("data-field=\"imageQuality\"", js)
+        self.assertNotIn("画质", js)
         self.assertIn(".image-option-grid", css)
         self.assertIn(".image-scale-group", css)
 
+    def test_canvas_switch_autosaves_and_tasks_can_focus_nodes(self):
+        js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
+        css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
+
+        self.assertIn("let dirty = false", js)
+        self.assertIn("async function saveCurrentCanvasIfDirty", js)
+        self.assertIn("await saveCurrentCanvasIfDirty()", js)
+        self.assertIn("addEventListener('beforeunload'", js)
+
+        self.assertIn("function taskTargetFor", js)
+        self.assertIn("function focusTask", js)
+        self.assertIn("data-task-id", js)
+        self.assertIn("button.addEventListener('click', () => focusTask(task)", js)
+        self.assertIn(".task-item.is-clickable", css)
 
 if __name__ == "__main__":
     unittest.main()

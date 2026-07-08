@@ -49,7 +49,6 @@
     videoModels: ['seedance-2.0', 'seedance-2.0-1080', 'seedance-2.0-vision-1080', 'veo3.1-fast'],
     ratios: ['1:1', '2:3', '3:2', '3:4', '4:3', '4:5', '5:4', '9:16', '16:9', '21:9'],
     imageSizes: ['自适应', '1K', '2K', '4K'],
-    imageQualities: ['标准画质', '高清', '超清'],
     imageScales: ['1', '2', '4'],
     resolutions: ['Auto', '720p', '1080p'],
     qualities: ['auto', 'low', 'medium', 'high']
@@ -123,6 +122,8 @@
   let minimapLayout = null;
   let activeEdgeCleanup = null;
   let addMenuWorldPoint = null;
+  let dirty = false;
+  let savingInFlight = null;
   let spaceDown = false;
   let activeDrag = null;
 
@@ -189,6 +190,7 @@
     window.alert(message);
   }
   function setDirty(value = true) {
+    dirty = !!value;
     els.saveState.textContent = value ? labels.unsaved : labels.saved;
   }
 
@@ -232,7 +234,6 @@
         model: nodePresets.imageModels[0],
         ratio: '1:1',
         imageSize: '自适应',
-        imageQuality: '标准画质',
         imageScale: '1',
         count: 1
       };
@@ -286,9 +287,7 @@
     };
     if (type === 'group') node.children = Array.isArray(source.children) ? source.children.slice() : [];
     if (type === 'image') {
-      const legacyQuality = { auto: '标准画质', low: '标准画质', medium: '高清', high: '超清' };
       node.imageSize = node.imageSize || '自适应';
-      node.imageQuality = node.imageQuality || legacyQuality[source.quality] || '标准画质';
       node.imageScale = String(node.imageScale || '1');
     }
     if (type === 'output' && !Array.isArray(node.outputItems)) node.outputItems = [];
@@ -503,6 +502,7 @@
   }
 
   async function selectProject(projectId) {
+    await saveCurrentCanvasIfDirty();
     currentProject = projects.find((item) => item.id === projectId) || projects[0] || null;
     renderProjects();
     if (!currentProject) return;
@@ -520,6 +520,7 @@
   }
 
   async function selectCanvas(canvasId) {
+    if (currentCanvas && currentCanvas.id !== canvasId) await saveCurrentCanvasIfDirty();
     const data = await api(`/api/canvases/${canvasId}`);
     currentCanvas = data.canvas;
     state = normalizeState(currentCanvas.state);
@@ -902,7 +903,6 @@
         <div class="image-option-grid">
           <label><span>比例</span><select data-field="ratio">${optionHtml(nodePresets.ratios, node.ratio)}</select></label>
           <label><span>尺寸</span><select data-field="imageSize">${optionHtml(nodePresets.imageSizes, node.imageSize)}</select></label>
-          <label><span>画质</span><select data-field="imageQuality">${optionHtml(nodePresets.imageQualities, node.imageQuality)}</select></label>
           <label><span>张数</span><input data-field="count" type="number" min="1" max="8" value="${escapeHtml(node.count || 1)}"></label>
           <div class="image-scale-group" aria-label="倍率">
             ${nodePresets.imageScales.map((scale) => chipHtml(scale, `${scale}x`, imageScale === scale, 'imageScale')).join('')}
@@ -1428,7 +1428,7 @@
     document.getElementById('inspectDeleteBtn').addEventListener('click', deleteSelected);
   }
 
-  async function saveCanvas() {
+  async function saveCanvas(options = {}) {
     if (!currentCanvas) return;
     els.saveState.textContent = labels.saving;
     const data = await api(`/api/canvases/${currentCanvas.id}`, {
@@ -1436,9 +1436,18 @@
       body: JSON.stringify({ name: currentCanvas.name, state })
     });
     currentCanvas = data.canvas;
-    addLog({ level: 'success', title: '画布已保存', detail: currentCanvas.name || labels.canvas });
+    if (!options.silent) addLog({ level: 'success', title: '画布已保存', detail: currentCanvas.name || labels.canvas });
     setDirty(false);
     renderCanvases();
+  }
+
+  async function saveCurrentCanvasIfDirty() {
+    if (!dirty || !currentCanvas) return;
+    if (savingInFlight) return savingInFlight;
+    savingInFlight = saveCanvas({ silent: true }).finally(() => {
+      savingInFlight = null;
+    });
+    return savingInFlight;
   }
   function upstreamNodes(nodeId) {
     return state.edges
@@ -1488,7 +1497,7 @@
 
   function taskParams(node) {
     if (node.type === 'image') {
-      return `# Params\nprovider=${node.apiProvider}; model=${node.model}; ratio=${node.ratio}; image_size=${node.imageSize}; image_quality=${node.imageQuality}; image_scale=${node.imageScale || 1}; count=${node.count || 1}`;
+      return `# Params\nprovider=${node.apiProvider}; model=${node.model}; ratio=${node.ratio}; image_size=${node.imageSize}; image_scale=${node.imageScale || 1}; count=${node.count || 1}`;
     }
     if (node.type === 'video') {
       return `# Params\nprovider=${node.apiProvider}; model=${node.model}; mode=${node.videoMode}; duration=${node.duration}; aspect=${node.aspectRatio}; resolution=${node.resolution}; output_fps=${node.outputFps || 0}; enhance_prompt=${!!node.enhancePrompt}; fixed_camera=${!!node.cameraFixed}; audio=${!!node.generateAudio}`;
@@ -1607,7 +1616,12 @@
     renderAll();
     const data = await api('/api/tasks', {
       method: 'POST',
-      body: JSON.stringify({ kind: node.type === 'image' ? 'image' : node.type, prompt: taskPrompt(node) })
+      body: JSON.stringify({
+        kind: node.type === 'image' ? 'image' : node.type,
+        prompt: taskPrompt(node),
+        canvas_id: currentCanvas?.id || '',
+        node_id: node.id
+      })
     });
     updateAccount({ ...me, credits: data.balance });
     applyTaskResult(node, data.task);
@@ -1697,6 +1711,32 @@
     }
   }
 
+  function taskTargetFor(task) {
+    if (task.canvas_id || task.node_id) {
+      return { canvasId: task.canvas_id || '', nodeId: task.node_id || '' };
+    }
+    const node = state.nodes.find((item) => item.taskId === task.id);
+    return node ? { canvasId: currentCanvas?.id || '', nodeId: node.id } : null;
+  }
+
+  async function focusTask(task) {
+    const target = taskTargetFor(task);
+    if (!target) {
+      addLog({ level: 'error', title: '任务未绑定节点', detail: task.id || '' });
+      return;
+    }
+    if (target.canvasId && (!currentCanvas || currentCanvas.id !== target.canvasId)) {
+      await selectCanvas(target.canvasId);
+    }
+    const node = target.nodeId ? nodeById(target.nodeId) : state.nodes.find((item) => item.taskId === task.id);
+    if (!node) {
+      addLog({ level: 'error', title: '未找到任务节点', detail: task.id || '' });
+      return;
+    }
+    selectOnly(node.id);
+    centerOnNode(node);
+  }
+
   async function loadTasks() {
     const data = await api('/api/tasks');
     const tasks = data.tasks || [];
@@ -1706,12 +1746,16 @@
     }
     els.taskList.innerHTML = '';
     tasks.slice(0, 18).forEach((task) => {
-      const item = document.createElement('div');
-      item.className = `task-item ${escapeHtml(task.status || '')}`;
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.setAttribute('data-task-id', task.id || '');
+      const target = taskTargetFor(task);
+      button.className = `task-item ${escapeHtml(task.status || '')}${target ? ' is-clickable' : ''}`;
       const kind = task.kind === 'image' ? '生图' : task.kind === 'video' ? '视频' : task.kind === 'llm' ? 'LLM' : task.kind;
       const statusMap = { queued: '排队中', running: '运行中', succeeded: '成功', failed: '失败' };
-      item.innerHTML = `<strong>${escapeHtml(kind)} / ${escapeHtml(statusMap[task.status] || task.status)}</strong><span>${escapeHtml(task.prompt || '').slice(0, 100)}</span>`;
-      els.taskList.appendChild(item);
+      button.innerHTML = `<strong>${escapeHtml(kind)} / ${escapeHtml(statusMap[task.status] || task.status)}</strong><span>${escapeHtml(task.prompt || '').slice(0, 100)}</span>`;
+      button.addEventListener('click', () => focusTask(task).catch(showError));
+      els.taskList.appendChild(button);
     });
   }
 
@@ -2013,6 +2057,7 @@
     els.newProjectBtn.addEventListener('click', async () => {
       const name = window.prompt('新项目名称', labels.defaultProject);
       if (!name) return;
+      await saveCurrentCanvasIfDirty();
       const data = await api('/api/projects', { method: 'POST', body: JSON.stringify({ name }) });
       projects.unshift(data.project);
       await selectProject(data.project.id);
@@ -2021,6 +2066,7 @@
       if (!currentProject) return;
       const name = window.prompt('新画布名称', labels.canvasName);
       if (!name) return;
+      await saveCurrentCanvasIfDirty();
       const data = await api(`/api/projects/${currentProject.id}/canvases`, { method: 'POST', body: JSON.stringify({ name }) });
       canvases.unshift(data.canvas);
       await selectCanvas(data.canvas.id);
@@ -2062,6 +2108,11 @@
     window.addEventListener('resize', () => {
       renderEdges();
       scheduleMinimapRender();
+    });
+    window.addEventListener('beforeunload', (event) => {
+      if (!dirty) return;
+      event.preventDefault();
+      event.returnValue = '';
     });
   }
   async function init() {

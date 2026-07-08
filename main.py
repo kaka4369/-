@@ -121,6 +121,13 @@ def row_dict(row: Optional[sqlite3.Row]) -> Optional[Dict[str, Any]]:
     return dict(row) if row else None
 
 
+def ensure_columns(conn: sqlite3.Connection, table: str, columns: Dict[str, str]) -> None:
+    existing = {row["name"] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()}
+    for name, definition in columns.items():
+        if name not in existing:
+            conn.execute(f"ALTER TABLE {table} ADD COLUMN {name} {definition}")
+
+
 def init_db() -> None:
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     STORAGE_DIR.mkdir(parents=True, exist_ok=True)
@@ -190,6 +197,8 @@ def init_db() -> None:
                 prompt TEXT NOT NULL,
                 cost INTEGER NOT NULL DEFAULT 0,
                 status TEXT NOT NULL,
+                canvas_id TEXT NOT NULL DEFAULT '',
+                node_id TEXT NOT NULL DEFAULT '',
                 result_json TEXT NOT NULL DEFAULT '{}',
                 error TEXT NOT NULL DEFAULT '',
                 refunded INTEGER NOT NULL DEFAULT 0,
@@ -204,6 +213,14 @@ def init_db() -> None:
                 updated_at INTEGER NOT NULL
             );
             """
+        )
+        ensure_columns(
+            conn,
+            "tasks",
+            {
+                "canvas_id": "TEXT NOT NULL DEFAULT ''",
+                "node_id": "TEXT NOT NULL DEFAULT ''",
+            },
         )
 
 
@@ -435,7 +452,7 @@ def save_canvas_state(user_id: str, canvas_id: str, state: Dict[str, Any], name:
     return get_canvas(user_id, canvas_id) or {}
 
 
-def create_task(user_id: str, kind: str, prompt: str, cost: int) -> Dict[str, Any]:
+def create_task(user_id: str, kind: str, prompt: str, cost: int, canvas_id: str = "", node_id: str = "") -> Dict[str, Any]:
     clean = clean_id(user_id)
     kind = str(kind or "").strip().lower()
     if kind not in {"llm", "image", "video"}:
@@ -447,8 +464,8 @@ def create_task(user_id: str, kind: str, prompt: str, cost: int) -> Dict[str, An
     ts = now_ms()
     with db() as conn:
         conn.execute(
-            "INSERT INTO tasks (id, user_id, kind, prompt, cost, status, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (task_id, clean, kind, str(prompt or "")[:20000], cost, "queued", ts, ts),
+            "INSERT INTO tasks (id, user_id, kind, prompt, cost, status, canvas_id, node_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (task_id, clean, kind, str(prompt or "")[:20000], cost, "queued", clean_id(canvas_id), clean_id(node_id), ts, ts),
         )
     return get_task(clean, task_id) or {}
 
@@ -645,6 +662,8 @@ class CanvasSavePayload(BaseModel):
 class TaskPayload(BaseModel):
     kind: str
     prompt: str = Field(min_length=1, max_length=20000)
+    canvas_id: str = ""
+    node_id: str = ""
 
 
 class CreditPayload(BaseModel):
@@ -805,7 +824,7 @@ async def api_asset(asset_id: str, request: Request):
 @app.post("/api/tasks")
 async def api_create_task(payload: TaskPayload, request: Request, background: BackgroundTasks):
     user = require_user(request)
-    task = create_task(user["id"], payload.kind, payload.prompt, task_cost(payload.kind))
+    task = create_task(user["id"], payload.kind, payload.prompt, task_cost(payload.kind), payload.canvas_id, payload.node_id)
     background.add_task(run_generation_task, task["id"])
     return {"task": task, "balance": credit_balance(user["id"])}
 

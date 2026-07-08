@@ -85,6 +85,23 @@ class CommercialCoreTest(unittest.TestCase):
         self.assertEqual(commercial_main.get_task(alice["id"], task["id"])["kind"], "image")
         self.assertIsNone(commercial_main.get_task(bob["id"], task["id"]))
 
+    def test_task_keeps_canvas_and_node_metadata_for_navigation(self):
+        with EnvPatch(INVITE_CODE="secret"):
+            user = commercial_main.register_user("meta@example.com", "password1", "secret")
+
+        task = commercial_main.create_task(
+            user["id"],
+            "image",
+            "prompt",
+            cost=0,
+            canvas_id="canvas_1",
+            node_id="node_1",
+        )
+        loaded = commercial_main.get_task(user["id"], task["id"])
+
+        self.assertEqual(loaded["canvas_id"], "canvas_1")
+        self.assertEqual(loaded["node_id"], "node_1")
+
 
 if __name__ == "__main__":
     unittest.main()

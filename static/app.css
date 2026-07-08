@@ -1153,10 +1153,21 @@ a { color: inherit; text-decoration: none; }
   gap: 8px;
 }
 .task-item {
+  width: 100%;
+  text-align: left;
   border: 1px solid var(--line);
   border-radius: var(--radius);
   background: var(--panel-2);
   padding: 10px;
+}
+.task-item.is-clickable {
+  cursor: pointer;
+}
+.task-item.is-clickable:hover,
+.task-item.is-clickable:focus-visible {
+  border-color: var(--accent);
+  background: #f8fbff;
+  outline: none;
 }
 .task-item strong,
 .task-item span {
