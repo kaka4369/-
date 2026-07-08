@@ -807,6 +807,7 @@
   }
 
   function stageProgressHtml(node) {
+    if (node.status === 'succeeded') return '';
     if (!['queued', 'running', 'succeeded', 'failed'].includes(node.status || '')) return '';
     const percent = generationProgress(node);
     return `

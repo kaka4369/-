@@ -98,6 +98,7 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("function renderProgressIndicators", js)
         self.assertIn("data-progress-node", js)
         self.assertIn("progressStartedAt", js)
+        self.assertIn("if (node.status === 'succeeded') return ''", js)
 
         self.assertIn(".stage-progress", css)
         self.assertIn(".stage-progress-fill", css)
@@ -118,7 +119,8 @@ class CanvasViewportUiTests(unittest.TestCase):
         css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
 
         self.assertIn(".node-image .node-stage-image", css)
-        self.assertIn("flex: 0 0 min(52%, 420px)", css)
+        self.assertIn("aspect-ratio: 4 / 3", css)
+        self.assertIn("flex: 0 0 auto", css)
         self.assertIn("max-height: 420px", css)
         self.assertIn(".node-image .node-console", css)
         self.assertIn("max-height: none", css)
@@ -151,6 +153,8 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn(".node-media-preview", css)
         self.assertIn("cursor: zoom-in", css)
         self.assertIn(".node-stage .node-media-preview .node-media", css)
+        self.assertIn(".node-image .node-media-preview", css)
+        self.assertIn("background: #edf2f8", css)
         self.assertIn("width: auto", css)
         self.assertIn("height: auto", css)
         self.assertIn(".media-preview-modal", css)
