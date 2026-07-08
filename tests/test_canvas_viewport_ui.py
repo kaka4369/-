@@ -36,17 +36,21 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("activeDrag.kind === 'resize-node'", js)
         self.assertIn(".node-resize", css)
 
-    def test_nodes_expose_visible_delete_action(self):
+    def test_edges_expose_visible_delete_action(self):
         css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
         js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
 
-        self.assertIn("deleteNode: '删除'", js)
-        self.assertIn('class="node-tool node-tool-delete"', js)
-        self.assertIn('data-node-action="delete"', js)
-        self.assertIn("deleteSelected()", js)
+        self.assertIn("let selectedEdgeId", js)
+        self.assertIn("function selectEdge", js)
+        self.assertIn("function deleteEdge", js)
+        self.assertIn("edge-delete-button", js)
+        self.assertIn("deleteEdge(selectedEdgeId)", js)
         self.assertIn("event.key === 'Delete' || event.key === 'Backspace'", js)
-        self.assertIn(".node-tools .node-tool-delete", css)
+        self.assertIn(".edge-path.selected", css)
+        self.assertIn(".edge-delete-button", css)
+        self.assertIn("pointer-events: stroke", css)
         self.assertIn("color: var(--danger)", css)
+        self.assertNotIn("node-tool-delete", js)
 
     def test_rendering_does_not_autoshrink_node_height(self):
         js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")

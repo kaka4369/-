@@ -10,7 +10,6 @@
     canvasName: '新画布',
     defaultProject: '默认项目',
     deleteConfirm: '确定删除选中的内容吗？',
-    deleteNode: '删除',
     failed: '失败',
     imagePrompt: '描述要生成的画面，可以连接提示词、角色图、场景图或参考图。',
     llmPrompt: '输入要改写、拆解或生成的内容；上游节点内容会自动带入。',
@@ -141,6 +140,7 @@
   let currentCanvas = null;
   let state = blankState();
   let selectedIds = new Set();
+  let selectedEdgeId = '';
   let draftEdge = null;
   let edgeRaf = 0;
   let minimapRaf = 0;
@@ -366,10 +366,12 @@
 
   function selectOnly(id) {
     selectedIds = id ? new Set([id]) : new Set();
+    selectedEdgeId = '';
     renderSelection();
   }
 
   function toggleSelect(id) {
+    selectedEdgeId = '';
     if (selectedIds.has(id)) selectedIds.delete(id);
     else selectedIds.add(id);
     renderSelection();
@@ -377,6 +379,7 @@
 
   function selectMany(ids) {
     selectedIds = new Set(ids);
+    selectedEdgeId = '';
     renderSelection();
   }
 
@@ -747,7 +750,6 @@
         </div>
         <div class="node-tools">
           <button class="node-tool node-tool-run" data-node-action="run" title="${escapeHtml(labels.runNode)}">${escapeHtml(labels.runNode)}</button>
-          <button class="node-tool node-tool-delete" data-node-action="delete" title="${escapeHtml(labels.deleteNode)}">${escapeHtml(labels.deleteNode)}</button>
         </div>
       </div>
       <div class="node-body">${nodeBodyHtml(node)}</div>
@@ -1088,7 +1090,7 @@
         runNode(node).catch(showError);
       });
     });
-    element.querySelector('[data-node-action="delete"]').addEventListener('click', (event) => {
+    element.querySelector('[data-node-action="delete"]')?.addEventListener('click', (event) => {
       event.stopPropagation();
       selectOnly(node.id);
       deleteSelected();
@@ -1360,6 +1362,27 @@
     addLog({ level: 'info', title: '已添加连线', detail: `${sourceNode.title} -> ${targetNode.title}` });
     setDirty();
   }
+
+  function selectEdge(edgeId) {
+    selectedIds.clear();
+    selectedEdgeId = edgeId || '';
+    renderSelection();
+  }
+
+  function deleteEdge(edgeId) {
+    const edge = state.edges.find((item) => item.id === edgeId);
+    if (!edge) return;
+    state.edges = state.edges.filter((item) => item.id !== edgeId);
+    if (selectedEdgeId === edgeId) selectedEdgeId = '';
+    const source = nodeById(edge.source);
+    const target = nodeById(edge.target);
+    addLog({ level: 'info', title: '已删除连线', detail: `${source?.title || edge.source} -> ${target?.title || edge.target}` });
+    renderEdges();
+    renderInspector();
+    renderWorkflowSummary();
+    setDirty();
+  }
+
   function portPoint(node, side) {
     const element = nodeElement(node.id);
     const height = element && node.type !== 'group' ? element.offsetHeight : node.h;
@@ -1373,6 +1396,13 @@
     const distance = Math.abs(end.x - start.x);
     const bend = Math.max(70, distance * 0.46);
     return `M ${start.x} ${start.y} C ${start.x + bend} ${start.y}, ${end.x - bend} ${end.y}, ${end.x} ${end.y}`;
+  }
+
+  function edgeDeletePoint(start, end) {
+    return {
+      x: (start.x + end.x) / 2,
+      y: (start.y + end.y) / 2
+    };
   }
 
   function scheduleEdges() {
@@ -1389,10 +1419,38 @@
       const source = nodeById(edge.source);
       const target = nodeById(edge.target);
       if (!source || !target || source.type === 'group' || target.type === 'group') return;
+      const start = portPoint(source, 'output');
+      const end = portPoint(target, 'input');
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('class', 'edge-path');
-      path.setAttribute('d', edgePath(portPoint(source, 'output'), portPoint(target, 'input')));
+      path.setAttribute('class', `edge-path${selectedEdgeId === edge.id ? ' selected' : ''}`);
+      path.setAttribute('data-edge-id', edge.id);
+      path.setAttribute('d', edgePath(start, end));
+      path.addEventListener('pointerdown', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        selectEdge(edge.id);
+      });
       els.edgeLayer.appendChild(path);
+      if (selectedEdgeId === edge.id) {
+        const point = edgeDeletePoint(start, end);
+        const wrap = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+        wrap.setAttribute('class', 'edge-delete-wrap');
+        wrap.setAttribute('x', `${point.x - 24}`);
+        wrap.setAttribute('y', `${point.y - 15}`);
+        wrap.setAttribute('width', '48');
+        wrap.setAttribute('height', '30');
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'edge-delete-button';
+        button.textContent = '删除';
+        button.addEventListener('click', (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          deleteEdge(edge.id);
+        });
+        wrap.appendChild(button);
+        els.edgeLayer.appendChild(wrap);
+      }
     });
     if (draftEdge) {
       const source = nodeById(draftEdge.source);
@@ -2560,7 +2618,10 @@
         closeMediaPreview();
       }
       if (editing) return;
-      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedIds.size) {
+      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedEdgeId) {
+        event.preventDefault();
+        deleteEdge(selectedEdgeId);
+      } else if ((event.key === 'Delete' || event.key === 'Backspace') && selectedIds.size) {
         event.preventDefault();
         deleteSelected();
       }
