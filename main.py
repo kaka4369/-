@@ -508,6 +508,126 @@ def list_tasks(user_id: str) -> list[Dict[str, Any]]:
     return tasks
 
 
+def media_kind_for_url(url: str, fallback: str = "") -> str:
+    value = str(url or "").lower()
+    if fallback in {"image", "video"}:
+        return fallback
+    if value.startswith("data:video") or re.search(r"\.(mp4|webm|mov|m4v|mkv)(\?|$)", value):
+        return "video"
+    return "image"
+
+
+def extract_result_assets(value: Any, fallback_kind: str = "") -> list[Dict[str, str]]:
+    assets: list[Dict[str, str]] = []
+    seen: set[str] = set()
+
+    def add_url(url: str, kind: str = "") -> None:
+        clean_url = str(url or "").strip()
+        if not clean_url or clean_url in seen:
+            return
+        if not re.match(r"^(https?:|data:|/api/assets/)", clean_url):
+            return
+        seen.add(clean_url)
+        assets.append({"url": clean_url, "kind": media_kind_for_url(clean_url, kind or fallback_kind)})
+
+    def walk(item: Any) -> None:
+        if isinstance(item, str):
+            add_url(item)
+            return
+        if isinstance(item, list):
+            for child in item:
+                walk(child)
+            return
+        if not isinstance(item, dict):
+            return
+        for key in ("url", "image_url", "video_url", "output_url", "download_url"):
+            if isinstance(item.get(key), str):
+                add_url(item[key])
+        for key in ("b64_json", "base64", "image_base64"):
+            if isinstance(item.get(key), str):
+                add_url(f"data:image/png;base64,{item[key]}", "image")
+        for child in item.values():
+            walk(child)
+
+    walk(value)
+    return assets
+
+
+def find_task_target(user_id: str, task_id: str) -> Optional[Dict[str, str]]:
+    clean_user = clean_id(user_id)
+    clean_task = clean_id(task_id)
+    task = get_task(clean_user, clean_task)
+    if not task:
+        return None
+    if task.get("canvas_id") or task.get("node_id"):
+        return {"canvas_id": task.get("canvas_id") or "", "node_id": task.get("node_id") or ""}
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT id, state_json FROM canvases WHERE user_id = ? ORDER BY updated_at DESC",
+            (clean_user,),
+        ).fetchall()
+    for row in rows:
+        try:
+            state = json.loads(row["state_json"] or "{}")
+        except Exception:
+            state = {}
+        for node in state.get("nodes") or []:
+            if isinstance(node, dict) and clean_id(node.get("taskId") or "") == clean_task:
+                return {"canvas_id": row["id"], "node_id": clean_id(node.get("id") or "")}
+    return None
+
+
+def list_assets(user_id: str) -> list[Dict[str, Any]]:
+    clean = clean_id(user_id)
+    assets: list[Dict[str, Any]] = []
+    with db() as conn:
+        uploaded = conn.execute(
+            "SELECT id, project_id, canvas_id, name, kind, url, created_at FROM assets WHERE user_id = ? ORDER BY created_at DESC LIMIT 300",
+            (clean,),
+        ).fetchall()
+        tasks = conn.execute(
+            "SELECT id, kind, prompt, canvas_id, node_id, result_json, created_at FROM tasks WHERE user_id = ? AND status = 'succeeded' ORDER BY created_at DESC LIMIT 300",
+            (clean,),
+        ).fetchall()
+    for row in uploaded:
+        assets.append(
+            {
+                "id": row["id"],
+                "source": "upload",
+                "title": row["name"],
+                "kind": row["kind"],
+                "url": row["url"],
+                "project_id": row["project_id"],
+                "canvas_id": row["canvas_id"],
+                "node_id": "",
+                "task_id": "",
+                "created_at": row["created_at"],
+            }
+        )
+    for row in tasks:
+        try:
+            result = json.loads(row["result_json"] or "{}")
+        except Exception:
+            result = {}
+        for index, media in enumerate(extract_result_assets(result, row["kind"])):
+            assets.append(
+                {
+                    "id": f"task_{row['id']}_{index}",
+                    "source": "task",
+                    "title": str(row["prompt"] or row["kind"])[:80],
+                    "kind": media["kind"],
+                    "url": media["url"],
+                    "project_id": "",
+                    "canvas_id": row["canvas_id"],
+                    "node_id": row["node_id"],
+                    "task_id": row["id"],
+                    "created_at": row["created_at"],
+                }
+            )
+    assets.sort(key=lambda item: int(item.get("created_at") or 0), reverse=True)
+    return assets
+
+
 def update_task_status(task_id: str, status: str, result: Optional[Dict[str, Any]] = None, error: str = "") -> None:
     with db() as conn:
         conn.execute(
@@ -835,6 +955,12 @@ async def api_tasks(request: Request):
     return {"tasks": list_tasks(user["id"])}
 
 
+@app.get("/api/tasks/{task_id}/target")
+async def api_task_target(task_id: str, request: Request):
+    user = require_user(request)
+    return {"target": find_task_target(user["id"], task_id)}
+
+
 @app.get("/api/tasks/{task_id}")
 async def api_task(task_id: str, request: Request):
     user = require_user(request)
@@ -842,6 +968,12 @@ async def api_task(task_id: str, request: Request):
     if not task:
         raise HTTPException(status_code=404, detail="任务不存在")
     return {"task": task, "balance": credit_balance(user["id"])}
+
+
+@app.get("/api/assets")
+async def api_assets(request: Request):
+    user = require_user(request)
+    return {"assets": list_assets(user["id"])}
 
 
 @app.get("/api/admin/users")

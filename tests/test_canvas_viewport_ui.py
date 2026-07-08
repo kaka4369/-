@@ -123,5 +123,24 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("button.addEventListener('click', () => focusTask(task)", js)
         self.assertIn(".task-item.is-clickable", css)
 
+    def test_sidebar_minimap_and_assets_are_canvas_friendly(self):
+        js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
+        css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
+
+        self.assertIn(".sidebar::after", css)
+        self.assertIn(".sidebar:hover", css)
+        self.assertIn("transform: translateX(calc(-100% + 18px))", css)
+
+        self.assertIn("function revealMinimap", js)
+        self.assertIn("minimap-active", js)
+        self.assertIn(".canvas-area.minimap-active .canvas-minimap", css)
+        self.assertIn("pointer-events: none", css)
+
+        self.assertIn("async function loadAssets", js)
+        self.assertIn("asset.task_id", js)
+        self.assertIn("/api/assets", js)
+        self.assertIn("function inspectTask", js)
+        self.assertIn("/target", js)
+
 if __name__ == "__main__":
     unittest.main()

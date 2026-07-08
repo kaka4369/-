@@ -119,7 +119,9 @@
   let edgeRaf = 0;
   let minimapRaf = 0;
   let progressTimer = null;
+  let minimapRevealTimer = null;
   let minimapLayout = null;
+  let assetCache = [];
   let activeEdgeCleanup = null;
   let addMenuWorldPoint = null;
   let dirty = false;
@@ -461,6 +463,15 @@
     els.minimapViewport.style.height = `${Math.max(8, view.h * mapScale)}px`;
   }
 
+  function revealMinimap(duration = 1500) {
+    if (!els.canvasArea) return;
+    window.clearTimeout(minimapRevealTimer);
+    els.canvasArea.classList.add('minimap-active');
+    if (duration > 0) {
+      minimapRevealTimer = window.setTimeout(() => els.canvasArea.classList.remove('minimap-active'), duration);
+    }
+  }
+
   function centerWorldPoint() {
     const rect = els.canvasArea.getBoundingClientRect();
     return clientToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
@@ -532,6 +543,7 @@
     renderAll();
     setDirty(false);
     await loadTasks();
+    await loadAssets();
   }
 
   function renderProjects() {
@@ -1130,6 +1142,7 @@
       state.viewport.x = activeDrag.viewport.x + event.clientX - activeDrag.start.x;
       state.viewport.y = activeDrag.viewport.y + event.clientY - activeDrag.start.y;
       applyViewport();
+      revealMinimap();
       setDirty();
       return;
     }
@@ -1666,6 +1679,7 @@
       }
       if (['succeeded', 'failed'].includes(data.task.status)) {
         await loadTasks();
+        await loadAssets();
         return;
       }
     }
@@ -1719,10 +1733,49 @@
     return node ? { canvasId: currentCanvas?.id || '', nodeId: node.id } : null;
   }
 
+  async function resolveTaskTarget(task) {
+    const local = taskTargetFor(task);
+    if (local) return local;
+    if (!task.id) return null;
+    const data = await api(`/api/tasks/${task.id}/target`);
+    return data.target || null;
+  }
+
+  function inspectTask(task) {
+    const result = task.result || {};
+    const url = findUrl(result);
+    const title = task.kind === 'image' ? '生图任务' : task.kind === 'video' ? '视频任务' : task.kind === 'llm' ? 'LLM 任务' : '任务';
+    const statusMap = { queued: '排队中', running: '运行中', succeeded: '成功', failed: '失败' };
+    const preview = url
+      ? (mediaKindForUrl(url, task.kind) === 'video'
+        ? `<video class="node-media" src="${escapeHtml(url)}" controls></video>`
+        : `<img class="node-media" src="${escapeHtml(url)}" alt="">`)
+      : '';
+    els.nodeInspector.innerHTML = `
+      <div class="inspect-grid">
+        <div class="pill-row">
+          <span class="pill">${escapeHtml(title)}</span>
+          <span class="pill">${escapeHtml(statusMap[task.status] || task.status || '')}</span>
+        </div>
+        ${preview}
+        <label>
+          <span class="inspect-label">任务 ID</span>
+          <input class="inspect-input" value="${escapeHtml(task.id || '')}" readonly>
+        </label>
+        <label>
+          <span class="inspect-label">内容</span>
+          <textarea class="inspect-input inspect-textarea" readonly>${escapeHtml(task.error || task.prompt || '')}</textarea>
+        </label>
+      </div>
+    `;
+    scrollPanelIntoView('inspectPanel');
+  }
+
   async function focusTask(task) {
-    const target = taskTargetFor(task);
+    const target = await resolveTaskTarget(task);
     if (!target) {
-      addLog({ level: 'error', title: '任务未绑定节点', detail: task.id || '' });
+      inspectTask(task);
+      addLog({ level: 'info', title: '已打开任务详情', detail: task.id || '' });
       return;
     }
     if (target.canvasId && (!currentCanvas || currentCanvas.id !== target.canvasId)) {
@@ -1730,7 +1783,8 @@
     }
     const node = target.nodeId ? nodeById(target.nodeId) : state.nodes.find((item) => item.taskId === task.id);
     if (!node) {
-      addLog({ level: 'error', title: '未找到任务节点', detail: task.id || '' });
+      inspectTask(task);
+      addLog({ level: 'info', title: '任务没有可定位节点', detail: task.id || '' });
       return;
     }
     selectOnly(node.id);
@@ -1749,8 +1803,7 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.setAttribute('data-task-id', task.id || '');
-      const target = taskTargetFor(task);
-      button.className = `task-item ${escapeHtml(task.status || '')}${target ? ' is-clickable' : ''}`;
+      button.className = `task-item ${escapeHtml(task.status || '')} is-clickable`;
       const kind = task.kind === 'image' ? '生图' : task.kind === 'video' ? '视频' : task.kind === 'llm' ? 'LLM' : task.kind;
       const statusMap = { queued: '排队中', running: '运行中', succeeded: '成功', failed: '失败' };
       button.innerHTML = `<strong>${escapeHtml(kind)} / ${escapeHtml(statusMap[task.status] || task.status)}</strong><span>${escapeHtml(task.prompt || '').slice(0, 100)}</span>`;
@@ -1775,22 +1828,48 @@
       assetName: data.asset.name || file.name || ''
     });
     addLog({ level: 'success', title: '文件已上传', detail: file.name || data.asset.name });
+    await loadAssets();
   }
+
+  async function loadAssets() {
+    const data = await api('/api/assets');
+    assetCache = data.assets || [];
+    renderAssets();
+  }
+
+  function uniqueAssets(items) {
+    const seen = new Set();
+    return items.filter((asset) => {
+      const key = asset.url || asset.id;
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
   function renderAssets() {
-    const assets = state.nodes
+    const nodeAssets = state.nodes
       .filter((node) => node.assetUrl || node.resultUrl)
       .map((node) => ({
         id: node.id,
+        source: 'node',
         title: node.assetName || node.title,
         url: node.resultUrl || node.assetUrl,
-        kind: node.resultKind || mediaKindForUrl(node.resultUrl || node.assetUrl)
+        kind: node.resultKind || mediaKindForUrl(node.resultUrl || node.assetUrl),
+        node_id: node.id,
+        canvas_id: currentCanvas?.id || '',
+        task_id: node.taskId || ''
       }));
+    const assets = uniqueAssets([...nodeAssets, ...assetCache]);
     if (!assets.length) {
       els.assetList.innerHTML = `<div class="muted">${labels.noAssets}</div>`;
       return;
     }
     els.assetList.innerHTML = assets.map((asset) => `
-      <button class="asset-item" type="button" data-select-node="${escapeHtml(asset.id)}">
+      <button class="asset-item" type="button"
+        ${asset.node_id ? `data-select-node="${escapeHtml(asset.node_id)}"` : ''}
+        ${asset.task_id ? `data-asset-task-id="${escapeHtml(asset.task_id)}"` : ''}
+        ${asset.canvas_id ? `data-asset-canvas-id="${escapeHtml(asset.canvas_id)}"` : ''}>
         ${asset.kind === 'video'
           ? `<video src="${escapeHtml(asset.url)}" muted></video>`
           : `<img src="${escapeHtml(asset.url)}" alt="">`}
@@ -1803,6 +1882,15 @@
         if (!node) return;
         selectOnly(node.id);
         centerOnNode(node);
+      });
+    });
+    els.assetList.querySelectorAll('[data-asset-task-id]').forEach((button) => {
+      button.addEventListener('click', () => {
+        focusTask({
+          id: button.dataset.assetTaskId || '',
+          canvas_id: button.dataset.assetCanvasId || '',
+          node_id: button.dataset.selectNode || ''
+        }).catch(showError);
       });
     });
   }
@@ -1941,6 +2029,7 @@
     state.viewport.x = canvasX - before.x * scale;
     state.viewport.y = canvasY - before.y * scale;
     applyViewport();
+    revealMinimap();
     setDirty();
   }
 
@@ -1954,6 +2043,7 @@
     state.viewport.x = rect.width / 2 - worldX * state.viewport.scale;
     state.viewport.y = rect.height / 2 - worldY * state.viewport.scale;
     applyViewport();
+    revealMinimap();
     setDirty();
   }
 
@@ -1975,12 +2065,14 @@
     };
     els.minimapView.addEventListener('pointerdown', (event) => {
       event.preventDefault();
+      revealMinimap(0);
       els.minimapView.setPointerCapture?.(event.pointerId);
       recenter(event);
       const onMove = (moveEvent) => recenter(moveEvent);
       const onUp = () => {
         els.minimapView.releasePointerCapture?.(event.pointerId);
         window.removeEventListener('pointermove', onMove);
+        revealMinimap();
       };
       window.addEventListener('pointermove', onMove);
       window.addEventListener('pointerup', onUp, { once: true });
@@ -2010,7 +2102,7 @@
     els.workflowBtn.addEventListener('click', () => scrollPanelIntoView('workflowPanel'));
     els.assetBtn.addEventListener('click', () => scrollPanelIntoView('assetPanel'));
     els.logBtn.addEventListener('click', () => scrollPanelIntoView('logPanel'));
-    els.refreshAssetBtn.addEventListener('click', renderAssets);
+    els.refreshAssetBtn.addEventListener('click', () => loadAssets().catch(showError));
     els.clearLogBtn.addEventListener('click', () => {
       state.logs = [];
       renderLogs();
@@ -2030,6 +2122,9 @@
     });
     els.zoomInBtn.addEventListener('click', () => zoomBy(1.25));
     bindMinimapEvents();
+    els.minimap.addEventListener('mouseenter', () => revealMinimap(0));
+    els.minimap.addEventListener('mouseleave', () => revealMinimap());
+    els.zoomChip.addEventListener('mouseenter', () => revealMinimap(2200));
     els.uploadBtn.addEventListener('click', () => els.fileInput.click());
     els.fileInput.addEventListener('change', () => {
       const file = els.fileInput.files && els.fileInput.files[0];

@@ -102,6 +102,50 @@ class CommercialCoreTest(unittest.TestCase):
         self.assertEqual(loaded["canvas_id"], "canvas_1")
         self.assertEqual(loaded["node_id"], "node_1")
 
+    def test_task_target_can_be_recovered_from_saved_canvas_state(self):
+        with EnvPatch(INVITE_CODE="secret"):
+            user = commercial_main.register_user("target@example.com", "password1", "secret")
+
+        project = commercial_main.create_project(user["id"], "Project")
+        canvas = commercial_main.create_canvas(user["id"], project["id"], "Canvas")
+        task = commercial_main.create_task(user["id"], "image", "prompt", cost=0)
+        commercial_main.save_canvas_state(
+            user["id"],
+            canvas["id"],
+            {
+                "nodes": [{"id": "node_1", "type": "image", "taskId": task["id"]}],
+                "edges": [],
+                "viewport": {"x": 0, "y": 0, "scale": 1},
+            },
+        )
+
+        self.assertEqual(
+            commercial_main.find_task_target(user["id"], task["id"]),
+            {"canvas_id": canvas["id"], "node_id": "node_1"},
+        )
+
+    def test_asset_library_includes_generated_task_media(self):
+        with EnvPatch(INVITE_CODE="secret"):
+            user = commercial_main.register_user("assets@example.com", "password1", "secret")
+
+        task = commercial_main.create_task(
+            user["id"],
+            "image",
+            "prompt",
+            cost=0,
+            canvas_id="canvas_1",
+            node_id="node_1",
+        )
+        commercial_main.complete_task(task["id"], {"items": [{"url": "https://example.com/result.png"}]})
+
+        assets = commercial_main.list_assets(user["id"])
+
+        self.assertEqual(assets[0]["url"], "https://example.com/result.png")
+        self.assertEqual(assets[0]["source"], "task")
+        self.assertEqual(assets[0]["task_id"], task["id"])
+        self.assertEqual(assets[0]["canvas_id"], "canvas_1")
+        self.assertEqual(assets[0]["node_id"], "node_1")
+
 
 if __name__ == "__main__":
     unittest.main()
