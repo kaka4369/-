@@ -121,7 +121,9 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn(".node-image .node-stage-image", css)
         self.assertIn("aspect-ratio: 4 / 3", css)
         self.assertIn("flex: 0 0 auto", css)
-        self.assertIn("max-height: 420px", css)
+        self.assertIn("width: min(100%, 560px)", css)
+        self.assertIn("max-height: none", css)
+        self.assertIn("align-self: center", css)
         self.assertIn(".node-image .node-console", css)
         self.assertIn("max-height: none", css)
 
