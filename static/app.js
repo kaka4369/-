@@ -97,6 +97,8 @@
     minimapView: document.getElementById('minimapView'),
     minimapViewport: document.getElementById('minimapViewport'),
     minimapZoom: document.getElementById('minimapZoom'),
+    mediaPreviewImage: document.getElementById('mediaPreviewImage'),
+    mediaPreviewModal: document.getElementById('mediaPreviewModal'),
     modalCredits: document.getElementById('modalCredits'),
     modalRole: document.getElementById('modalRole'),
     newCanvasBtn: document.getElementById('newCanvasBtn'),
@@ -650,7 +652,12 @@
     if (kind === 'video' || node.type === 'video') {
       return `<video class="node-media${compact ? ' compact' : ''}" src="${safe}" controls></video>`;
     }
-    return `<img class="node-media${compact ? ' compact' : ''}" src="${safe}" alt="asset" loading="lazy" />`;
+    if (compact) return `<img class="node-media compact" src="${safe}" alt="asset" loading="lazy" />`;
+    return `
+      <button class="node-media-preview" type="button" data-preview-media="${safe}" aria-label="查看完整图片">
+        <img class="node-media" src="${safe}" alt="asset" loading="lazy" />
+      </button>
+    `;
   }
 
   function renderNodes() {
@@ -2157,6 +2164,18 @@
     document.execCommand('copy');
     textarea.remove();
   }
+
+  function openMediaPreview(url) {
+    if (!url) return;
+    els.mediaPreviewImage.src = url;
+    els.mediaPreviewModal.classList.remove('hidden');
+  }
+
+  function closeMediaPreview() {
+    els.mediaPreviewModal.classList.add('hidden');
+    els.mediaPreviewImage.removeAttribute('src');
+  }
+
   function centerOnNode(node) {
     const rect = els.canvasArea.getBoundingClientRect();
     state.viewport.x = rect.width / 2 - (node.x + node.w / 2) * state.viewport.scale;
@@ -2336,6 +2355,19 @@
     els.minimap.addEventListener('mouseenter', () => revealMinimap(0));
     els.minimap.addEventListener('mouseleave', () => revealMinimap());
     els.zoomChip.addEventListener('mouseenter', () => revealMinimap(2200));
+    els.nodeLayer.addEventListener('click', (event) => {
+      const trigger = event.target.closest('[data-preview-media]');
+      if (!trigger) return;
+      event.preventDefault();
+      event.stopPropagation();
+      openMediaPreview(trigger.dataset.previewMedia || '');
+    });
+    els.mediaPreviewModal.querySelectorAll('[data-preview-close]').forEach((button) => {
+      button.addEventListener('click', closeMediaPreview);
+    });
+    els.mediaPreviewModal.addEventListener('click', (event) => {
+      if (event.target === els.mediaPreviewModal) closeMediaPreview();
+    });
     els.uploadBtn.addEventListener('click', () => els.fileInput.click());
     els.fileInput.addEventListener('change', () => {
       const file = els.fileInput.files && els.fileInput.files[0];
@@ -2389,7 +2421,10 @@
         spaceDown = true;
         event.preventDefault();
       }
-      if (event.key === 'Escape') hideAddMenu();
+      if (event.key === 'Escape') {
+        hideAddMenu();
+        closeMediaPreview();
+      }
       if (editing) return;
       if ((event.key === 'Delete' || event.key === 'Backspace') && selectedIds.size) {
         event.preventDefault();

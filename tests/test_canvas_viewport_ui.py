@@ -114,6 +114,26 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn(".node-image .node-console", css)
         self.assertIn("max-height: none", css)
 
+    def test_generated_images_are_contained_and_click_to_preview(self):
+        html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
+        css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
+        js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="mediaPreviewModal"', html)
+        self.assertIn('id="mediaPreviewImage"', html)
+        self.assertIn("mediaPreviewModal: document.getElementById('mediaPreviewModal')", js)
+        self.assertIn("data-preview-media", js)
+        self.assertIn("function openMediaPreview", js)
+        self.assertIn("function closeMediaPreview", js)
+        self.assertIn("data-preview-close", js)
+
+        self.assertIn(".node-media-preview", css)
+        self.assertIn("cursor: zoom-in", css)
+        self.assertIn(".node-stage .node-media-preview .node-media", css)
+        self.assertIn("width: auto", css)
+        self.assertIn("height: auto", css)
+        self.assertIn(".media-preview-modal", css)
+
     def test_image_nodes_expose_ratio_size_and_scale_controls_without_quality(self):
         js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
         css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
