@@ -119,13 +119,33 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("flex-direction: column", css)
         self.assertIn("flex: 1 1", css)
 
-    def test_asset_button_toggles_back_to_canvas(self):
+    def test_asset_button_opens_left_asset_drawer(self):
+        html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
+        css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
         js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
 
+        self.assertIn('id="railAssetBtn"', html)
+        self.assertIn('id="assetDrawer"', html)
+        self.assertIn('id="assetDrawerGrid"', html)
+        self.assertIn(".quick-rail", css)
+        self.assertIn(".asset-drawer", css)
+        self.assertIn("#assetPanel", css)
+        self.assertIn("display: none", css)
         self.assertIn("function toggleAssetPage", js)
-        self.assertIn("if (currentView === 'assets')", js)
-        self.assertIn("showCanvasPage();", js)
+        self.assertIn("function showAssetDrawer", js)
+        self.assertIn("function renderAssetDrawer", js)
+        self.assertIn("hideAssetDrawer", js)
+        self.assertIn("els.railAssetBtn?.addEventListener('click', toggleAssetPage)", js)
         self.assertIn("els.assetBtn.addEventListener('click', toggleAssetPage)", js)
+
+    def test_left_rail_exposes_new_canvas_action(self):
+        html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
+        js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn('id="leftNewCanvasBtn"', html)
+        self.assertIn("async function createCanvasFromPrompt", js)
+        self.assertIn("els.leftNewCanvasBtn?.addEventListener('click'", js)
+        self.assertIn("await createCanvasFromPrompt()", js)
 
     def test_image_result_preview_is_visually_balanced(self):
         css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
@@ -254,8 +274,13 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("function showAssetPage", js)
         self.assertIn("function showCanvasPage", js)
         self.assertIn("function renderAssetPage", js)
+        self.assertIn("function renderAssetDrawer", js)
         self.assertIn("function renderAssetSidebarSummary", js)
+        self.assertIn('id="assetDrawer"', html)
+        self.assertIn('id="assetDrawerGrid"', html)
+        self.assertIn('id="leftNewCanvasBtn"', html)
         self.assertIn(".asset-page", css)
+        self.assertIn(".asset-drawer-grid", css)
         self.assertIn(".asset-grid", css)
         self.assertIn(".asset-preview", css)
 

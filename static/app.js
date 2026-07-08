@@ -65,6 +65,12 @@
     assetAllCount: document.getElementById('assetAllCount'),
     assetBackBtn: document.getElementById('assetBackBtn'),
     assetBtn: document.getElementById('assetBtn'),
+    assetDrawer: document.getElementById('assetDrawer'),
+    assetDrawerCloseBtn: document.getElementById('assetDrawerCloseBtn'),
+    assetDrawerCount: document.getElementById('assetDrawerCount'),
+    assetDrawerGrid: document.getElementById('assetDrawerGrid'),
+    assetDrawerSearch: document.getElementById('assetDrawerSearch'),
+    assetDrawerUploadBtn: document.getElementById('assetDrawerUploadBtn'),
     assetGrid: document.getElementById('assetGrid'),
     assetImageCount: document.getElementById('assetImageCount'),
     assetList: document.getElementById('assetList'),
@@ -91,6 +97,7 @@
     exportWorkflowBtn: document.getElementById('exportWorkflowBtn'),
     fileInput: document.getElementById('fileInput'),
     groupBtn: document.getElementById('groupBtn'),
+    leftNewCanvasBtn: document.getElementById('leftNewCanvasBtn'),
     logBtn: document.getElementById('logBtn'),
     logList: document.getElementById('logList'),
     logoutBtn: document.getElementById('logoutBtn'),
@@ -108,6 +115,7 @@
     nodeInspector: document.getElementById('nodeInspector'),
     nodeLayer: document.getElementById('nodeLayer'),
     projectList: document.getElementById('projectList'),
+    railAssetBtn: document.getElementById('railAssetBtn'),
     refreshAssetBtn: document.getElementById('refreshAssetBtn'),
     runBtn: document.getElementById('runBtn'),
     runChainBtn: document.getElementById('runChainBtn'),
@@ -1928,8 +1936,8 @@
     return '当前画布';
   }
 
-  function filteredAssets(assets) {
-    const keyword = String(els.assetSearchInput?.value || '').trim().toLowerCase();
+  function filteredAssets(assets, keyword = String(els.assetSearchInput?.value || '').trim().toLowerCase()) {
+    const search = String(keyword || '').trim().toLowerCase();
     return assets.filter((asset) => {
       const kindOk = assetFilter === 'all'
         || (assetFilter === 'image' && asset.kind === 'image')
@@ -1937,9 +1945,9 @@
         || (assetFilter === 'upload' && asset.source === 'upload')
         || (assetFilter === 'task' && asset.source === 'task');
       if (!kindOk) return false;
-      if (!keyword) return true;
+      if (!search) return true;
       return [asset.title, asset.kind, asset.source, asset.task_id, asset.node_id]
-        .some((value) => String(value || '').toLowerCase().includes(keyword));
+        .some((value) => String(value || '').toLowerCase().includes(search));
     });
   }
 
@@ -1964,7 +1972,7 @@
         <button class="small-button" type="button" data-open-assets>进入素材库</button>
       `;
     }
-    els.assetList.querySelector('[data-open-assets]')?.addEventListener('click', () => showAssetPage());
+    els.assetList.querySelector('[data-open-assets]')?.addEventListener('click', () => showAssetDrawer().catch(showError));
   }
 
   function renderAssetPreview(asset) {
@@ -2065,25 +2073,108 @@
     renderAssetPreview(visible.find((asset) => (asset.id || asset.url) === selectedAssetId) || visible[0]);
   }
 
+  function focusAsset(asset) {
+    if (!asset) return;
+    if (asset.node_id || asset.task_id) {
+      hideAssetDrawer();
+      focusTask({
+        id: asset.task_id || '',
+        canvas_id: asset.canvas_id || '',
+        node_id: asset.node_id || ''
+      }).catch(showError);
+      return;
+    }
+    if (asset.url && asset.kind === 'image') openMediaPreview(asset.url);
+    else if (asset.url) window.open(asset.url, '_blank', 'noreferrer');
+  }
+
+  function renderAssetDrawer() {
+    if (!els.assetDrawerGrid) return;
+    const assets = currentAssetItems();
+    const keyword = String(els.assetDrawerSearch?.value || '').trim().toLowerCase();
+    const visible = filteredAssets(assets, keyword);
+    els.assetDrawerCount.textContent = `${visible.length} / ${assets.length} 个素材`;
+    document.querySelectorAll('[data-asset-tab]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.assetTab === assetFilter);
+    });
+    const uploadCard = `
+      <button class="drawer-upload-card" type="button" data-upload-from-drawer>
+        <strong>上传素材</strong>
+        <small>保存到当前画布</small>
+      </button>
+    `;
+    if (!visible.length) {
+      els.assetDrawerGrid.innerHTML = `
+        ${uploadCard}
+        <div class="drawer-empty">${assets.length ? '当前筛选下暂无素材' : labels.noAssets}</div>
+      `;
+      els.assetDrawerGrid.querySelector('[data-upload-from-drawer]')?.addEventListener('click', () => els.fileInput.click());
+      return;
+    }
+    els.assetDrawerGrid.innerHTML = `
+      ${uploadCard}
+      ${visible.map((asset) => {
+        const id = asset.id || asset.url;
+        return `
+          <button class="drawer-asset-card" type="button" data-drawer-asset-id="${escapeHtml(id)}" title="${escapeHtml(asset.title || '素材')}">
+            <span class="drawer-asset-thumb">
+              ${asset.kind === 'video'
+                ? `<video src="${escapeHtml(asset.url)}" muted></video>`
+                : `<img src="${escapeHtml(asset.url)}" alt="" draggable="false">`}
+            </span>
+            <strong>${escapeHtml(asset.title || '素材')}</strong>
+            <small>${escapeHtml(assetSourceLabel(asset))}</small>
+          </button>
+        `;
+      }).join('')}
+    `;
+    els.assetDrawerGrid.querySelector('[data-upload-from-drawer]')?.addEventListener('click', () => els.fileInput.click());
+    els.assetDrawerGrid.querySelectorAll('[data-drawer-asset-id]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const asset = visible.find((item) => (item.id || item.url) === button.dataset.drawerAssetId);
+        focusAsset(asset);
+      });
+    });
+  }
+
   function renderAssets() {
     const assets = currentAssetItems();
     renderAssetSidebarSummary(assets);
     renderAssetPage();
+    renderAssetDrawer();
+  }
+
+  function hideAssetDrawer() {
+    els.assetDrawer?.classList.add('hidden');
+    els.railAssetBtn?.classList.remove('active');
+    els.assetBtn?.classList.remove('active');
   }
 
   function showCanvasPage() {
     currentView = 'canvas';
     els.assetPage.classList.add('hidden');
     els.canvasArea.classList.remove('hidden');
-    els.assetBtn.classList.remove('active');
+    if (!els.assetDrawer || els.assetDrawer.classList.contains('hidden')) {
+      els.assetBtn.classList.remove('active');
+    }
     els.canvasTitle.textContent = currentCanvas?.name || labels.canvas;
     applyViewport();
     renderEdges();
     scheduleMinimapRender();
   }
 
+  async function showAssetDrawer() {
+    if (currentView === 'assets') showCanvasPage();
+    await loadAssets();
+    els.assetDrawer?.classList.remove('hidden');
+    els.railAssetBtn?.classList.add('active');
+    els.assetBtn?.classList.add('active');
+    renderAssetDrawer();
+  }
+
   async function showAssetPage() {
     currentView = 'assets';
+    hideAssetDrawer();
     await loadAssets();
     els.canvasArea.classList.add('hidden');
     els.assetPage.classList.remove('hidden');
@@ -2093,11 +2184,12 @@
   }
 
   function toggleAssetPage() {
-    if (currentView === 'assets') {
-      showCanvasPage();
+    if (currentView === 'assets') showCanvasPage();
+    if (els.assetDrawer && !els.assetDrawer.classList.contains('hidden')) {
+      hideAssetDrawer();
       return;
     }
-    showAssetPage().catch(showError);
+    showAssetDrawer().catch(showError);
   }
 
   function addLog(entry) {
@@ -2326,6 +2418,17 @@
     zoomAtCanvasPoint(point.x, point.y, state.viewport.scale * Math.exp(-event.deltaY * 0.0012));
   }
 
+  async function createCanvasFromPrompt() {
+    if (!currentProject) return;
+    const name = window.prompt('新画布名称', labels.canvasName);
+    if (!name) return;
+    await saveCurrentCanvasIfDirty();
+    const data = await api(`/api/projects/${currentProject.id}/canvases`, { method: 'POST', body: JSON.stringify({ name }) });
+    canvases.unshift(data.canvas);
+    hideAssetDrawer();
+    await selectCanvas(data.canvas.id);
+  }
+
   function bindEvents() {
     els.toolbar.querySelectorAll('[data-add]').forEach((button) => {
       button.addEventListener('click', () => {
@@ -2345,6 +2448,10 @@
     els.saveBtn.addEventListener('click', () => saveCanvas().catch(showError));
     els.workflowBtn.addEventListener('click', () => scrollPanelIntoView('workflowPanel'));
     els.assetBtn.addEventListener('click', toggleAssetPage);
+    els.railAssetBtn?.addEventListener('click', toggleAssetPage);
+    els.assetDrawerCloseBtn?.addEventListener('click', hideAssetDrawer);
+    els.assetDrawerUploadBtn?.addEventListener('click', () => els.fileInput.click());
+    els.assetDrawerSearch?.addEventListener('input', renderAssetDrawer);
     els.logBtn.addEventListener('click', () => scrollPanelIntoView('logPanel'));
     els.refreshAssetBtn.addEventListener('click', () => loadAssets().catch(showError));
     els.assetPageRefreshBtn.addEventListener('click', () => loadAssets().catch(showError));
@@ -2353,7 +2460,7 @@
     document.querySelectorAll('[data-asset-tab]').forEach((button) => {
       button.addEventListener('click', () => {
         assetFilter = button.dataset.assetTab || 'all';
-        renderAssetPage();
+        renderAssets();
       });
     });
     els.clearLogBtn.addEventListener('click', () => {
@@ -2432,14 +2539,9 @@
       await selectProject(data.project.id);
     });
     els.newCanvasBtn.addEventListener('click', async () => {
-      if (!currentProject) return;
-      const name = window.prompt('新画布名称', labels.canvasName);
-      if (!name) return;
-      await saveCurrentCanvasIfDirty();
-      const data = await api(`/api/projects/${currentProject.id}/canvases`, { method: 'POST', body: JSON.stringify({ name }) });
-      canvases.unshift(data.canvas);
-      await selectCanvas(data.canvas.id);
+      await createCanvasFromPrompt();
     });
+    els.leftNewCanvasBtn?.addEventListener('click', () => createCanvasFromPrompt().catch(showError));
     els.accountBtn.addEventListener('click', () => els.accountModal.classList.remove('hidden'));
     els.closeAccount.addEventListener('click', () => els.accountModal.classList.add('hidden'));
     els.logoutBtn.addEventListener('click', async () => {
@@ -2454,6 +2556,7 @@
       }
       if (event.key === 'Escape') {
         hideAddMenu();
+        hideAssetDrawer();
         closeMediaPreview();
       }
       if (editing) return;

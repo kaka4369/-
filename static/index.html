@@ -8,6 +8,11 @@
 </head>
 <body>
   <div class="app-shell">
+    <nav class="quick-rail" aria-label="&#24555;&#25463;&#24037;&#20855;">
+      <button id="leftNewCanvasBtn" class="rail-button rail-primary" type="button" title="&#26032;&#22686;&#30011;&#24067;">+</button>
+      <button id="railAssetBtn" class="rail-button" type="button" title="&#32032;&#26448;&#24211;">&#24211;</button>
+    </nav>
+
     <aside class="sidebar">
       <div class="brand-row">
         <div class="brand-mark">CS</div>
@@ -39,6 +44,27 @@
           <strong id="creditText">0 &#28857;</strong>
         </button>
       </section>
+    </aside>
+
+    <aside id="assetDrawer" class="asset-drawer hidden" aria-label="&#32032;&#26448;&#24211;">
+      <div class="asset-drawer-head">
+        <div>
+          <strong>&#32032;&#26448;&#24211;</strong>
+          <span id="assetDrawerCount">0 &#20010;&#32032;&#26448;</span>
+        </div>
+        <div class="asset-drawer-actions">
+          <button id="assetDrawerUploadBtn" class="mini-button" type="button" title="&#19978;&#20256;">+</button>
+          <button id="assetDrawerCloseBtn" class="mini-button" type="button" title="&#20851;&#38381;">x</button>
+        </div>
+      </div>
+      <input id="assetDrawerSearch" class="asset-drawer-search" type="search" placeholder="&#25628;&#32034;&#32032;&#26448;" />
+      <div class="asset-drawer-tabs" aria-label="&#32032;&#26448;&#31579;&#36873;">
+        <button class="active" type="button" data-asset-tab="all">&#20840;&#37096;</button>
+        <button type="button" data-asset-tab="image">&#22270;&#29255;</button>
+        <button type="button" data-asset-tab="video">&#35270;&#39057;</button>
+        <button type="button" data-asset-tab="task">&#29983;&#25104;</button>
+      </div>
+      <div id="assetDrawerGrid" class="asset-drawer-grid"></div>
     </aside>
 
     <main class="main">
