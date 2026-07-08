@@ -1423,36 +1423,38 @@
       if (!source || !target || source.type === 'group' || target.type === 'group') return;
       const start = portPoint(source, 'output');
       const end = portPoint(target, 'input');
+      const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      group.setAttribute('class', `edge-group${selectedEdgeId === edge.id ? ' selected' : ''}`);
+      group.setAttribute('data-edge-id', edge.id);
       const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-      path.setAttribute('class', `edge-path${selectedEdgeId === edge.id ? ' selected' : ''}`);
-      path.setAttribute('data-edge-id', edge.id);
+      path.setAttribute('class', 'edge-path');
       path.setAttribute('d', edgePath(start, end));
       path.addEventListener('pointerdown', (event) => {
         event.preventDefault();
         event.stopPropagation();
         selectEdge(edge.id);
       });
-      els.edgeLayer.appendChild(path);
-      if (selectedEdgeId === edge.id) {
-        const point = edgeDeletePoint(start, end);
-        const wrap = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
-        wrap.setAttribute('class', 'edge-delete-wrap');
-        wrap.setAttribute('x', `${point.x - 24}`);
-        wrap.setAttribute('y', `${point.y - 15}`);
-        wrap.setAttribute('width', '48');
-        wrap.setAttribute('height', '30');
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'edge-delete-button';
-        button.textContent = '删除';
-        button.addEventListener('click', (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          deleteEdge(edge.id);
-        });
-        wrap.appendChild(button);
-        els.edgeLayer.appendChild(wrap);
-      }
+      group.appendChild(path);
+      const point = edgeDeletePoint(start, end);
+      const wrap = document.createElementNS('http://www.w3.org/2000/svg', 'foreignObject');
+      wrap.setAttribute('class', 'edge-delete-wrap');
+      wrap.setAttribute('x', `${point.x - 14}`);
+      wrap.setAttribute('y', `${point.y - 14}`);
+      wrap.setAttribute('width', '28');
+      wrap.setAttribute('height', '28');
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'edge-delete-button';
+      button.textContent = '×';
+      button.setAttribute('aria-label', '断开连线');
+      button.addEventListener('click', (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        deleteEdge(edge.id);
+      });
+      wrap.appendChild(button);
+      group.appendChild(wrap);
+      els.edgeLayer.appendChild(group);
     });
     if (draftEdge) {
       const source = nodeById(draftEdge.source);
