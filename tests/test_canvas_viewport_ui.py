@@ -97,6 +97,23 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("flex-direction: column", css)
         self.assertIn("flex: 1 1", css)
 
+    def test_asset_button_toggles_back_to_canvas(self):
+        js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("function toggleAssetPage", js)
+        self.assertIn("if (currentView === 'assets')", js)
+        self.assertIn("showCanvasPage();", js)
+        self.assertIn("els.assetBtn.addEventListener('click', toggleAssetPage)", js)
+
+    def test_image_result_preview_is_visually_balanced(self):
+        css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
+
+        self.assertIn(".node-image .node-stage-image", css)
+        self.assertIn("flex: 0 0 min(42%, 320px)", css)
+        self.assertIn("max-height: 320px", css)
+        self.assertIn(".node-image .node-console", css)
+        self.assertIn("max-height: none", css)
+
     def test_image_nodes_expose_ratio_size_and_scale_controls_without_quality(self):
         js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
         css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")

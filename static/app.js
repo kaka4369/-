@@ -2058,6 +2058,14 @@
     renderAssetPage();
   }
 
+  function toggleAssetPage() {
+    if (currentView === 'assets') {
+      showCanvasPage();
+      return;
+    }
+    showAssetPage().catch(showError);
+  }
+
   function addLog(entry) {
     if (!state.logs) state.logs = [];
     state.logs.push({
@@ -2290,7 +2298,7 @@
     els.runChainBtn.addEventListener('click', () => runChain().catch(showError));
     els.saveBtn.addEventListener('click', () => saveCanvas().catch(showError));
     els.workflowBtn.addEventListener('click', () => scrollPanelIntoView('workflowPanel'));
-    els.assetBtn.addEventListener('click', () => showAssetPage().catch(showError));
+    els.assetBtn.addEventListener('click', toggleAssetPage);
     els.logBtn.addEventListener('click', () => scrollPanelIntoView('logPanel'));
     els.refreshAssetBtn.addEventListener('click', () => loadAssets().catch(showError));
     els.assetPageRefreshBtn.addEventListener('click', () => loadAssets().catch(showError));
