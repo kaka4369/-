@@ -184,8 +184,8 @@
   }
 
   function showError(error) {
-    const message = error?.message || String(error || 'Unknown error');
-    addLog({ level: 'error', title: 'Request failed', detail: message });
+    const message = error?.message || String(error || '未知错误');
+    addLog({ level: 'error', title: '请求失败', detail: message });
     window.alert(message);
   }
   function setDirty(value = true) {
@@ -662,8 +662,8 @@
     element.style.setProperty('--h', `${node.h}px`);
     element.innerHTML = `
       <div class="group-title">${escapeHtml(node.title || typeNames.group)}</div>
-      <div class="group-count">${groupChildren(node).length} nodes</div>
-      <div class="group-resize" title="Resize group"></div>
+      <div class="group-count">${groupChildren(node).length} 个节点</div>
+      <div class="group-resize" title="调整分组大小"></div>
     `;
     element.querySelector('.group-title').addEventListener('pointerdown', (event) => startNodeDrag(event, node, true));
     element.querySelector('.group-resize').addEventListener('pointerdown', (event) => startGroupResize(event, node));
@@ -685,7 +685,7 @@
     element.style.setProperty('--w', `${node.w}px`);
     element.style.setProperty('--h', `${node.h}px`);
     element.innerHTML = `
-      <button class="node-port input" data-port="input" title="Input"></button>
+      <button class="node-port input" data-port="input" title="输入"></button>
       <button class="node-port output" data-port="output" title="输出"></button>
       <div class="node-head">
         <div class="node-title-wrap">
@@ -698,7 +698,7 @@
         </div>
       </div>
       <div class="node-body">${nodeBodyHtml(node)}</div>
-      <button class="node-resize" type="button" title="Resize" aria-label="Resize"></button>
+      <button class="node-resize" type="button" title="调整大小" aria-label="调整大小"></button>
     `;
 
     element.addEventListener('pointerdown', (event) => {
@@ -727,7 +727,7 @@
 
   function upstreamPreviewHtml(node) {
     const upstream = upstreamNodes(node.id);
-    if (!upstream.length) return '<div class="node-empty">No upstream nodes connected.</div>';
+    if (!upstream.length) return '<div class="node-empty">未连接上游节点</div>';
     return upstream.map((item) => {
       const media = mediaHtml(item, true);
       const text = nodeContent(item).slice(0, 160);
@@ -1278,7 +1278,7 @@
     if (!sourceNode || !targetNode || sourceNode.type === 'group' || targetNode.type === 'group') return;
     if (state.edges.some((edge) => edge.source === source && edge.target === target)) return;
     state.edges.push({ id: uid('edge'), source, target });
-    addLog({ level: 'info', title: 'Connection added', detail: `${sourceNode.title} -> ${targetNode.title}` });
+    addLog({ level: 'info', title: '已添加连线', detail: `${sourceNode.title} -> ${targetNode.title}` });
     setDirty();
   }
   function portPoint(node, side) {
@@ -1603,7 +1603,7 @@
     node.progressStartedAt = Date.now();
     node.resultText = '';
     node.resultUrl = '';
-    addLog({ level: 'info', title: 'Node queued', detail: `${typeNames[node.type]} -> ${node.title}` });
+    addLog({ level: 'info', title: '节点已加入队列', detail: `${typeNames[node.type]} -> ${node.title}` });
     renderAll();
     const data = await api('/api/tasks', {
       method: 'POST',
@@ -1626,7 +1626,7 @@
       node.resultText = upstreamContext(node) || node.prompt || '';
     }
     node.status = 'succeeded';
-    addLog({ level: 'success', title: 'Local node completed', detail: `${typeNames[node.type]} -> ${node.title}` });
+    addLog({ level: 'success', title: '本地节点已完成', detail: `${typeNames[node.type]} -> ${node.title}` });
     renderAll();
     setDirty();
   }
@@ -1665,7 +1665,7 @@
       return;
     }
     const order = collectRunOrder(roots);
-    addLog({ level: 'info', title: 'Chain started', detail: `${order.length} nodes` });
+    addLog({ level: 'info', title: '链路开始运行', detail: `${order.length} 个节点` });
     for (const node of order) {
       if (node.type === 'group') continue;
       await runNode(node);
@@ -1674,7 +1674,7 @@
         await waitForNodeDone(node.id);
       }
     }
-    addLog({ level: 'success', title: 'Chain finished', detail: `${order.length} nodes` });
+    addLog({ level: 'success', title: '链路运行完成', detail: `${order.length} 个节点` });
   }
   function collectRunOrder(roots) {
     const seen = new Set();
@@ -1769,7 +1769,7 @@
       id: uid('log'),
       at: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
       level: entry.level || 'info',
-      title: entry.title || 'Log',
+      title: entry.title || '日志',
       detail: entry.detail || ''
     });
     state.logs = state.logs.slice(-80);
