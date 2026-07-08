@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Canvas SaaS</title>
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body class="auth-body">
+  <main class="auth-shell">
+    <section class="auth-panel">
+      <div class="brand-mark">CS</div>
+      <p class="eyebrow">Canvas SaaS Commercial</p>
+      <h1 id="authTitle">&#30331;&#24405;</h1>
+      <p id="authSubtitle">&#36827;&#20837;&#20320;&#30340;&#21830;&#19994;&#30011;&#24067;&#24037;&#20316;&#21488;</p>
+      <form id="authForm">
+        <label id="inviteLabel" class="field-label">&#36992;&#35831;&#30721;</label>
+        <input id="inviteCode" class="field-input" autocomplete="one-time-code" placeholder="canvasv1" />
+        <label class="field-label">&#37038;&#31665;</label>
+        <input id="email" class="field-input" type="email" autocomplete="email" placeholder="you@company.com" required />
+        <label class="field-label">&#23494;&#30721;</label>
+        <input id="password" class="field-input" type="password" autocomplete="current-password" required />
+        <button class="primary-button full" type="submit">&#32487;&#32493;</button>
+      </form>
+      <div id="authError" class="error-line"></div>
+      <a id="switchAuth" class="text-link" href="/register">&#27809;&#26377;&#36134;&#21495;&#65292;&#21435;&#27880;&#20876;</a>
+    </section>
+  </main>
+  <script>
+    const text = {
+      loginTitle: '\u767b\u5f55',
+      registerTitle: '\u6ce8\u518c\u8d26\u53f7',
+      loginSubtitle: '\u8fdb\u5165\u4f60\u7684\u5546\u4e1a\u753b\u5e03\u5de5\u4f5c\u53f0',
+      registerSubtitle: '\u4f7f\u7528\u9080\u8bf7\u7801\u521b\u5efa\u56e2\u961f\u8d26\u53f7',
+      loginLink: '\u6ca1\u6709\u8d26\u53f7\uff0c\u53bb\u6ce8\u518c',
+      registerLink: '\u5df2\u6709\u8d26\u53f7\uff0c\u53bb\u767b\u5f55',
+      failed: '\u64cd\u4f5c\u5931\u8d25'
+    };
+    const isRegister = location.pathname.includes('register');
+    const title = document.getElementById('authTitle');
+    const subtitle = document.getElementById('authSubtitle');
+    const invite = document.getElementById('inviteCode');
+    const inviteLabel = document.getElementById('inviteLabel');
+    const link = document.getElementById('switchAuth');
+    const form = document.getElementById('authForm');
+    const error = document.getElementById('authError');
+    title.textContent = isRegister ? text.registerTitle : text.loginTitle;
+    subtitle.textContent = isRegister ? text.registerSubtitle : text.loginSubtitle;
+    invite.hidden = !isRegister;
+    inviteLabel.hidden = !isRegister;
+    invite.required = isRegister;
+    link.href = isRegister ? '/login' : '/register';
+    link.textContent = isRegister ? text.registerLink : text.loginLink;
+    form.addEventListener('submit', async (event) => {
+      event.preventDefault();
+      error.textContent = '';
+      const payload = {
+        email: document.getElementById('email').value.trim(),
+        password: document.getElementById('password').value
+      };
+      if (isRegister) payload.invite_code = invite.value.trim();
+      const res = await fetch(isRegister ? '/api/auth/register' : '/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        error.textContent = data.detail || text.failed;
+        return;
+      }
+      location.href = '/';
+    });
+  </script>
+</body>
+</html>

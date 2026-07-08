@@ -1,0 +1,2061 @@
+(() => {
+  const WORLD = { width: 200000, height: 200000 };
+  const MIN_ZOOM = 0.02;
+  const MAX_ZOOM = 8;
+
+  const labels = {
+    account: 'Account',
+    admin: 'Admin',
+    canvas: 'Canvas',
+    canvasName: 'New Canvas',
+    defaultProject: 'Default Project',
+    deleteConfirm: 'Delete selected items?',
+    failed: 'Failed',
+    imagePrompt: 'Describe the image to generate. You can connect prompt, character, scene, or reference nodes.',
+    llmPrompt: 'Enter content to rewrite, split, or generate. Upstream node results will be included automatically.',
+    loading: 'Loading',
+    noAssets: 'No assets yet. Uploaded files and generated results will appear here.',
+    noCanvas: 'No canvas',
+    noLogs: 'No logs',
+    noProject: 'No project',
+    noTasks: 'No tasks',
+    outputPrompt: 'Collect upstream node results as final output, preview, or delivery notes.',
+    promptText: 'Enter prompt, script fragment, character setting, storyboard note, or asset note.',
+    running: 'Running',
+    saved: 'Saved',
+    saving: 'Saving',
+    selectRunnable: 'Select a runnable node',
+    unsaved: 'Unsaved',
+    user: 'User',
+    videoPrompt: 'Describe the video shot to generate. You can connect image, character, scene, or storyboard nodes.'
+  };
+
+  const typeNames = {
+    prompt: 'Prompt',
+    loop: 'Loop',
+    llm: 'LLM',
+    image: 'API Generate',
+    video: 'Video Generate',
+    output: 'Output',
+    group: 'Group'
+  };
+
+  const nodePresets = {
+    llmProviders: ['Guohe API', 'OpenAI Compatible', 'Custom'],
+    llmModels: ['gpt-5.5', 'deepseek-v4-pro', 'claude-opus-4-8', 'gemini-3.5-flash'],
+    imageProviders: ['Guohe API', 'OpenAI Compatible', 'Custom'],
+    imageModels: ['gpt-image-2', 'gemini-3.1-flash-image'],
+    videoProviders: ['Lingjing API', 'Volcengine', 'Custom'],
+    videoModels: ['seedance-2.0', 'seedance-2.0-1080', 'seedance-2.0-vision-1080', 'veo3.1-fast'],
+    ratios: ['1:1', '3:4', '4:3', '9:16', '16:9', '21:9'],
+    resolutions: ['Auto', '720p', '1080p'],
+    qualities: ['auto', 'low', 'medium', 'high']
+  };
+  const els = {
+    accountBtn: document.getElementById('accountBtn'),
+    accountEmail: document.getElementById('accountEmail'),
+    accountLine: document.getElementById('accountLine'),
+    accountModal: document.getElementById('accountModal'),
+    addMenu: document.getElementById('addMenu'),
+    adminLink: document.getElementById('adminLink'),
+    assetBtn: document.getElementById('assetBtn'),
+    assetList: document.getElementById('assetList'),
+    backToOriginBtn: document.getElementById('backToOriginBtn'),
+    canvasArea: document.getElementById('canvasArea'),
+    canvasList: document.getElementById('canvasList'),
+    canvasTitle: document.getElementById('canvasTitle'),
+    clearLogBtn: document.getElementById('clearLogBtn'),
+    closeAccount: document.getElementById('closeAccount'),
+    copyWorkflowBtn: document.getElementById('copyWorkflowBtn'),
+    creditText: document.getElementById('creditText'),
+    edgeLayer: document.getElementById('edgeLayer'),
+    emptyHint: document.getElementById('emptyHint'),
+    exportWorkflowBtn: document.getElementById('exportWorkflowBtn'),
+    fileInput: document.getElementById('fileInput'),
+    groupBtn: document.getElementById('groupBtn'),
+    logBtn: document.getElementById('logBtn'),
+    logList: document.getElementById('logList'),
+    logoutBtn: document.getElementById('logoutBtn'),
+    minimap: document.getElementById('minimap'),
+    minimapContent: document.getElementById('minimapContent'),
+    minimapView: document.getElementById('minimapView'),
+    minimapViewport: document.getElementById('minimapViewport'),
+    minimapZoom: document.getElementById('minimapZoom'),
+    modalCredits: document.getElementById('modalCredits'),
+    modalRole: document.getElementById('modalRole'),
+    newCanvasBtn: document.getElementById('newCanvasBtn'),
+    newProjectBtn: document.getElementById('newProjectBtn'),
+    nodeInspector: document.getElementById('nodeInspector'),
+    nodeLayer: document.getElementById('nodeLayer'),
+    projectList: document.getElementById('projectList'),
+    refreshAssetBtn: document.getElementById('refreshAssetBtn'),
+    runBtn: document.getElementById('runBtn'),
+    runChainBtn: document.getElementById('runChainBtn'),
+    saveBtn: document.getElementById('saveBtn'),
+    saveState: document.getElementById('saveState'),
+    selectionBox: document.getElementById('selectionBox'),
+    taskList: document.getElementById('taskList'),
+    toolbar: document.querySelector('.toolbar'),
+    uploadBtn: document.getElementById('uploadBtn'),
+    workflowBtn: document.getElementById('workflowBtn'),
+    workflowSummary: document.getElementById('workflowSummary'),
+    world: document.getElementById('world'),
+    zoomChip: document.getElementById('zoomChip'),
+    zoomInBtn: document.getElementById('zoomInBtn'),
+    zoomOutBtn: document.getElementById('zoomOutBtn'),
+    zoomResetBtn: document.getElementById('zoomResetBtn')
+  };
+
+  let me = null;
+  let projects = [];
+  let canvases = [];
+  let currentProject = null;
+  let currentCanvas = null;
+  let state = blankState();
+  let selectedIds = new Set();
+  let draftEdge = null;
+  let edgeRaf = 0;
+  let minimapRaf = 0;
+  let progressTimer = null;
+  let minimapLayout = null;
+  let activeEdgeCleanup = null;
+  let addMenuWorldPoint = null;
+  let spaceDown = false;
+  let activeDrag = null;
+
+  function blankState() {
+    return {
+      nodes: [],
+      edges: [],
+      logs: [],
+      viewport: { x: 120, y: 80, scale: 1 }
+    };
+  }
+
+  function uid(prefix = 'node') {
+    return `${prefix}_${Math.random().toString(16).slice(2)}${Date.now().toString(16)}`;
+  }
+
+  function clamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, (char) => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#039;'
+    }[char]));
+  }
+
+  function safeNumber(value, fallback) {
+    const num = Number(value);
+    return Number.isFinite(num) ? num : fallback;
+  }
+
+  function optionHtml(options, selected) {
+    return options.map((item) => `<option value="${escapeHtml(item)}"${item === selected ? ' selected' : ''}>${escapeHtml(item)}</option>`).join('');
+  }
+
+  function chipHtml(value, label, active, field) {
+    return `<button class="chip${active ? ' active' : ''}" type="button" data-chip-field="${escapeHtml(field)}" data-chip-value="${escapeHtml(value)}">${escapeHtml(label)}</button>`;
+  }
+
+  async function api(path, options = {}) {
+    const res = await fetch(path, {
+      credentials: 'same-origin',
+      ...options,
+      headers: options.body instanceof FormData
+        ? (options.headers || {})
+        : { 'Content-Type': 'application/json', ...(options.headers || {}) }
+    });
+    if (res.status === 401 && path !== '/api/me') {
+      location.href = '/login';
+      throw new Error('unauthorized');
+    }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.detail || data.message || labels.failed);
+    return data;
+  }
+
+  function showError(error) {
+    const message = error?.message || String(error || 'Unknown error');
+    addLog({ level: 'error', title: 'Request failed', detail: message });
+    window.alert(message);
+  }
+  function setDirty(value = true) {
+    els.saveState.textContent = value ? labels.unsaved : labels.saved;
+  }
+
+  function defaultSize(type) {
+    if (type === 'group') return { w: 540, h: 340 };
+    if (type === 'llm') return { w: 390, h: 410 };
+    if (type === 'image') return { w: 520, h: 520 };
+    if (type === 'video') return { w: 560, h: 540 };
+    if (type === 'output') return { w: 380, h: 300 };
+    if (type === 'loop') return { w: 340, h: 300 };
+    return { w: 460, h: 380 };
+  }
+
+  function defaultPrompt(type) {
+    if (type === 'llm') return labels.llmPrompt;
+    if (type === 'image') return labels.imagePrompt;
+    if (type === 'video') return labels.videoPrompt;
+    if (type === 'output') return labels.outputPrompt;
+    return labels.promptText;
+  }
+
+  function defaultsForType(type) {
+    if (type === 'loop') {
+      return {
+        prompt: 'Loop over multiple shots or assets.',
+        loopItems: 'Item 1: first variable set\nItem 2: second variable set\nItem 3: third variable set'
+      };
+    }
+    if (type === 'llm') {
+      return {
+        llmProvider: nodePresets.llmProviders[0],
+        model: nodePresets.llmModels[0],
+        systemPrompt: 'You are a reliable AI creative assistant. Use upstream content to produce clear actionable output.',
+        mode: 'node',
+        outputText: ''
+      };
+    }
+    if (type === 'image') {
+      return {
+        apiProvider: nodePresets.imageProviders[0],
+        model: nodePresets.imageModels[0],
+        ratio: '1:1',
+        quality: 'auto',
+        count: 1
+      };
+    }
+    if (type === 'video') {
+      return {
+        apiProvider: nodePresets.videoProviders[0],
+        model: nodePresets.videoModels[0],
+        videoMode: 'text_to_video',
+        duration: 5,
+        aspectRatio: '16:9',
+        resolution: 'Auto',
+        outputFps: 0,
+        enhancePrompt: false,
+        cameraFixed: false,
+        generateAudio: false,
+        firstLastFrame: false
+      };
+    }
+    if (type === 'output') {
+      return {
+        outputItems: []
+      };
+    }
+    return {};
+  }
+
+  function normalizeNode(raw) {
+    const source = raw && typeof raw === 'object' ? raw : {};
+    const type = source.type || 'prompt';
+    const size = defaultSize(type);
+    const defaults = defaultsForType(type);
+    const node = {
+      ...defaults,
+      ...source,
+      id: source.id || uid(type),
+      type,
+      title: source.title || typeNames[type] || 'Node',
+      x: safeNumber(source.x, 0),
+      y: safeNumber(source.y, 0),
+      w: clamp(safeNumber(source.w, size.w), 180, 1400),
+      h: clamp(safeNumber(source.h, size.h), 140, 1400),
+      prompt: source.prompt || defaults.prompt || defaultPrompt(type),
+      status: source.status || '',
+      resultText: source.resultText || source.outputText || '',
+      resultUrl: source.resultUrl || source.assetUrl || '',
+      resultKind: source.resultKind || '',
+      taskId: source.taskId || '',
+      progress: clamp(safeNumber(source.progress, 0), 0, 100),
+      progressStartedAt: safeNumber(source.progressStartedAt, 0)
+    };
+    if (type === 'group') node.children = Array.isArray(source.children) ? source.children.slice() : [];
+    if (type === 'output' && !Array.isArray(node.outputItems)) node.outputItems = [];
+    return node;
+  }
+
+  function normalizeState(raw) {
+    const source = raw && typeof raw === 'object' ? raw : blankState();
+    const viewport = source.viewport && typeof source.viewport === 'object' ? source.viewport : {};
+    return {
+      nodes: Array.isArray(source.nodes) ? source.nodes.map(normalizeNode) : [],
+      edges: Array.isArray(source.edges)
+        ? source.edges.filter((edge) => edge && edge.source && edge.target).map((edge) => ({
+            id: edge.id || uid('edge'),
+            source: edge.source,
+            target: edge.target
+          }))
+        : [],
+      logs: Array.isArray(source.logs) ? source.logs.slice(-80) : [],
+      viewport: {
+        x: Number.isFinite(viewport.x) ? viewport.x : 120,
+        y: Number.isFinite(viewport.y) ? viewport.y : 80,
+        scale: Number.isFinite(viewport.scale) ? clamp(viewport.scale, MIN_ZOOM, MAX_ZOOM) : 1
+      }
+    };
+  }
+
+  function nodeById(id) {
+    return state.nodes.find((node) => node.id === id) || null;
+  }
+
+  function selectedNodes() {
+    return state.nodes.filter((node) => selectedIds.has(node.id));
+  }
+
+  function selectOnly(id) {
+    selectedIds = id ? new Set([id]) : new Set();
+    renderSelection();
+  }
+
+  function toggleSelect(id) {
+    if (selectedIds.has(id)) selectedIds.delete(id);
+    else selectedIds.add(id);
+    renderSelection();
+  }
+
+  function selectMany(ids) {
+    selectedIds = new Set(ids);
+    renderSelection();
+  }
+
+  function clientToWorld(clientX, clientY) {
+    const rect = els.canvasArea.getBoundingClientRect();
+    const scale = state.viewport.scale || 1;
+    return {
+      x: (clientX - rect.left - state.viewport.x) / scale,
+      y: (clientY - rect.top - state.viewport.y) / scale
+    };
+  }
+
+  function clientToCanvas(clientX, clientY) {
+    const rect = els.canvasArea.getBoundingClientRect();
+    return { x: clientX - rect.left, y: clientY - rect.top };
+  }
+
+  function visibleWorldRect() {
+    const rect = els.canvasArea.getBoundingClientRect();
+    const scale = state.viewport.scale || 1;
+    return {
+      x: -state.viewport.x / scale,
+      y: -state.viewport.y / scale,
+      w: rect.width / scale,
+      h: rect.height / scale
+    };
+  }
+
+  function contentBounds() {
+    const view = visibleWorldRect();
+    const rects = state.nodes.map((node) => ({
+      x: safeNumber(node.x, 0),
+      y: safeNumber(node.y, 0),
+      w: Math.max(20, safeNumber(node.w, defaultSize(node.type).w)),
+      h: Math.max(20, safeNumber(node.h, defaultSize(node.type).h))
+    }));
+    rects.push(view);
+    if (!rects.length) rects.push({ x: -500, y: -300, w: 1000, h: 600 });
+
+    let minX = Math.min(...rects.map((item) => item.x));
+    let minY = Math.min(...rects.map((item) => item.y));
+    let maxX = Math.max(...rects.map((item) => item.x + item.w));
+    let maxY = Math.max(...rects.map((item) => item.y + item.h));
+    const padding = Math.max(220, Math.min(900, Math.max(maxX - minX, maxY - minY) * 0.08));
+    minX -= padding;
+    minY -= padding;
+    maxX += padding;
+    maxY += padding;
+
+    return {
+      x: minX,
+      y: minY,
+      w: Math.max(1, maxX - minX),
+      h: Math.max(1, maxY - minY)
+    };
+  }
+
+  function zoomText(scale = state.viewport.scale) {
+    return `${Math.round(scale * 100)}%`;
+  }
+
+  function syncWorldSize() {
+    const width = `${WORLD.width}px`;
+    const height = `${WORLD.height}px`;
+    els.world.style.width = width;
+    els.world.style.height = height;
+    els.nodeLayer.style.width = width;
+    els.nodeLayer.style.height = height;
+    els.edgeLayer.setAttribute('width', String(WORLD.width));
+    els.edgeLayer.setAttribute('height', String(WORLD.height));
+    els.edgeLayer.setAttribute('viewBox', `0 0 ${WORLD.width} ${WORLD.height}`);
+  }
+
+  function applyViewport() {
+    const { x, y, scale } = state.viewport;
+    const gridSize = Math.max(7, 28 * scale);
+    els.world.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${scale})`;
+    els.canvasArea.style.backgroundSize = `${gridSize}px ${gridSize}px, 100% 100%`;
+    els.canvasArea.style.backgroundPosition = `${x % gridSize}px ${y % gridSize}px, 0 0`;
+    els.zoomChip.textContent = zoomText(scale);
+    els.minimapZoom.textContent = zoomText(scale);
+    scheduleMinimapRender();
+  }
+
+  function scheduleMinimapRender() {
+    if (minimapRaf) return;
+    minimapRaf = requestAnimationFrame(() => {
+      minimapRaf = 0;
+      renderMinimap();
+    });
+  }
+
+  function renderMinimap() {
+    if (!els.minimapView || !els.minimapContent || !els.minimapViewport) return;
+    const rect = els.minimapView.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+
+    const bounds = contentBounds();
+    const mapScale = Math.min(rect.width / bounds.w, rect.height / bounds.h);
+    const contentW = bounds.w * mapScale;
+    const contentH = bounds.h * mapScale;
+    const offsetX = (rect.width - contentW) / 2;
+    const offsetY = (rect.height - contentH) / 2;
+    minimapLayout = { bounds, scale: mapScale, offsetX, offsetY };
+
+    els.minimapContent.style.left = `${offsetX}px`;
+    els.minimapContent.style.top = `${offsetY}px`;
+    els.minimapContent.style.width = `${contentW}px`;
+    els.minimapContent.style.height = `${contentH}px`;
+    els.minimapContent.innerHTML = state.nodes.map((node) => {
+      const typeClass = String(node.type || '').replace(/[^a-z0-9_-]/gi, '');
+      const left = (safeNumber(node.x, 0) - bounds.x) * mapScale;
+      const top = (safeNumber(node.y, 0) - bounds.y) * mapScale;
+      const width = Math.max(3, safeNumber(node.w, defaultSize(node.type).w) * mapScale);
+      const height = Math.max(3, safeNumber(node.h, defaultSize(node.type).h) * mapScale);
+      return `<span class="minimap-node ${typeClass}" style="left:${left}px;top:${top}px;width:${width}px;height:${height}px"></span>`;
+    }).join('');
+
+    const view = visibleWorldRect();
+    els.minimapViewport.style.left = `${offsetX + (view.x - bounds.x) * mapScale}px`;
+    els.minimapViewport.style.top = `${offsetY + (view.y - bounds.y) * mapScale}px`;
+    els.minimapViewport.style.width = `${Math.max(8, view.w * mapScale)}px`;
+    els.minimapViewport.style.height = `${Math.max(8, view.h * mapScale)}px`;
+  }
+
+  function centerWorldPoint() {
+    const rect = els.canvasArea.getBoundingClientRect();
+    return clientToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
+  }
+
+  function updateAccount(user = me) {
+    if (!user) return;
+    me = user;
+    els.accountEmail.textContent = user.email || labels.account;
+    els.creditText.textContent = `${user.credits || 0} pts`;
+    els.accountLine.textContent = user.email || '';
+    els.modalCredits.textContent = user.credits || 0;
+    els.modalRole.textContent = user.is_admin ? labels.admin : labels.user;
+    els.adminLink.classList.toggle('hidden', !user.is_admin);
+  }
+
+  async function loadMe() {
+    const data = await api('/api/me');
+    if (!data.user) {
+      location.href = '/login';
+      return null;
+    }
+    updateAccount(data.user);
+    return data.user;
+  }
+
+  async function loadProjects() {
+    const data = await api('/api/projects');
+    projects = data.projects || [];
+    if (!projects.length) {
+      const created = await api('/api/projects', {
+        method: 'POST',
+        body: JSON.stringify({ name: labels.defaultProject })
+      });
+      projects = [created.project];
+    }
+    renderProjects();
+    await selectProject(projects[0].id);
+  }
+
+  async function selectProject(projectId) {
+    currentProject = projects.find((item) => item.id === projectId) || projects[0] || null;
+    renderProjects();
+    if (!currentProject) return;
+    const data = await api(`/api/projects/${currentProject.id}/canvases`);
+    canvases = data.canvases || [];
+    if (!canvases.length) {
+      const created = await api(`/api/projects/${currentProject.id}/canvases`, {
+        method: 'POST',
+        body: JSON.stringify({ name: labels.canvasName })
+      });
+      canvases = [created.canvas];
+    }
+    renderCanvases();
+    await selectCanvas(canvases[0].id);
+  }
+
+  async function selectCanvas(canvasId) {
+    const data = await api(`/api/canvases/${canvasId}`);
+    currentCanvas = data.canvas;
+    state = normalizeState(currentCanvas.state);
+    selectedIds.clear();
+    draftEdge = null;
+    els.canvasTitle.textContent = currentCanvas.name || labels.canvas;
+    applyViewport();
+    renderCanvases();
+    renderAll();
+    setDirty(false);
+    await loadTasks();
+  }
+
+  function renderProjects() {
+    els.projectList.innerHTML = projects.length ? '' : `<div class="muted">${labels.noProject}</div>`;
+    projects.forEach((project) => {
+      const button = document.createElement('button');
+      button.className = `nav-item${currentProject && currentProject.id === project.id ? ' active' : ''}`;
+      button.innerHTML = `<span>${escapeHtml(project.name)}</span><small>${project.canvas_count || 0}</small>`;
+      button.addEventListener('click', () => selectProject(project.id).catch(showError));
+      els.projectList.appendChild(button);
+    });
+  }
+
+  function renderCanvases() {
+    els.canvasList.innerHTML = canvases.length ? '' : `<div class="muted">${labels.noCanvas}</div>`;
+    canvases.forEach((canvas) => {
+      const button = document.createElement('button');
+      button.className = `nav-item${currentCanvas && currentCanvas.id === canvas.id ? ' active' : ''}`;
+      button.innerHTML = `<span>${escapeHtml(canvas.name)}</span><small>${labels.canvas}</small>`;
+      button.addEventListener('click', () => selectCanvas(canvas.id).catch(showError));
+      els.canvasList.appendChild(button);
+    });
+  }
+
+  function addNode(type, patch = {}) {
+    const center = centerWorldPoint();
+    const size = defaultSize(type);
+    const placedCount = state.nodes.filter((item) => item.type !== 'group').length;
+    const col = placedCount % 2;
+    const row = Math.floor(placedCount / 2);
+    const node = normalizeNode({
+      id: uid(type),
+      type,
+      x: center.x - 360 + col * 400,
+      y: center.y - 165 + row * 315,
+      w: size.w,
+      h: size.h,
+      title: typeNames[type] || 'Node',
+      prompt: defaultPrompt(type),
+      ...patch
+    });
+    state.nodes.push(node);
+    selectOnly(node.id);
+    addLog({ level: 'info', title: 'Node added', detail: `${typeNames[type] || type} - ${node.title}` });
+    renderAll();
+    setDirty();
+    return node;
+  }
+
+  function renderAll() {
+    renderNodes();
+    renderEdges();
+    renderInspector();
+    renderAssets();
+    renderLogs();
+    renderWorkflowSummary();
+    scheduleMinimapRender();
+    syncProgressTicker();
+    els.emptyHint.classList.toggle('hidden', state.nodes.length > 0);
+  }
+
+  function renderSelection() {
+    els.nodeLayer.querySelectorAll('[data-node-id]').forEach((element) => {
+      const selected = selectedIds.has(element.dataset.nodeId);
+      element.classList.toggle('selected', selected);
+      element.classList.toggle('multi', selected && selectedIds.size > 1);
+    });
+    renderEdges();
+    renderInspector();
+    renderWorkflowSummary();
+  }
+
+  function mediaKindForUrl(url, fallback = '') {
+    const value = String(url || '').toLowerCase();
+    if (fallback) return fallback;
+    if (/\.(mp4|webm|mov|m4v|mkv)(\?|$)/i.test(value)) return 'video';
+    if (/\.(mp3|wav|m4a|aac|ogg|flac)(\?|$)/i.test(value)) return 'audio';
+    return 'image';
+  }
+
+  function mediaHtml(node, compact = false) {
+    const url = node.resultUrl || node.assetUrl || '';
+    if (!url) return '';
+    const safe = escapeHtml(url);
+    const kind = mediaKindForUrl(url, node.resultKind);
+    if (kind === 'video' || node.type === 'video') {
+      return `<video class="node-media${compact ? ' compact' : ''}" src="${safe}" controls></video>`;
+    }
+    return `<img class="node-media${compact ? ' compact' : ''}" src="${safe}" alt="asset" loading="lazy" />`;
+  }
+
+  function renderNodes() {
+    els.nodeLayer.innerHTML = '';
+    const groups = state.nodes.filter((node) => node.type === 'group');
+    const regular = state.nodes.filter((node) => node.type !== 'group');
+    groups.forEach(renderGroupNode);
+    regular.forEach(renderRegularNode);
+    requestAnimationFrame(() => {
+      state.nodes.forEach((node) => {
+        const element = nodeElement(node.id);
+        if (element && node.type !== 'group') node.h = Math.max(180, element.offsetHeight);
+      });
+      renderEdges();
+      scheduleMinimapRender();
+    });
+  }
+
+  function nodeElement(id) {
+    return els.nodeLayer.querySelector(`[data-node-id="${CSS.escape(id)}"]`);
+  }
+
+  function applyNodePosition(node) {
+    const element = nodeElement(node.id);
+    if (!element) return;
+    element.style.setProperty('--x', `${node.x}px`);
+    element.style.setProperty('--y', `${node.y}px`);
+    element.style.setProperty('--w', `${node.w}px`);
+    element.style.setProperty('--h', `${node.h}px`);
+    element.style.setProperty('--h', `${node.h}px`);
+  }
+
+  function renderGroupNode(node) {
+    const element = document.createElement('section');
+    element.className = `group-node${selectedIds.has(node.id) ? ' selected' : ''}`;
+    element.dataset.nodeId = node.id;
+    element.style.setProperty('--x', `${node.x}px`);
+    element.style.setProperty('--y', `${node.y}px`);
+    element.style.setProperty('--w', `${node.w}px`);
+    element.style.setProperty('--h', `${node.h}px`);
+    element.innerHTML = `
+      <div class="group-title">${escapeHtml(node.title || typeNames.group)}</div>
+      <div class="group-count">${groupChildren(node).length} nodes</div>
+      <div class="group-resize" title="Resize group"></div>
+    `;
+    element.querySelector('.group-title').addEventListener('pointerdown', (event) => startNodeDrag(event, node, true));
+    element.querySelector('.group-resize').addEventListener('pointerdown', (event) => startGroupResize(event, node));
+    element.addEventListener('pointerdown', (event) => {
+      if (event.target.closest('.group-resize')) return;
+      event.stopPropagation();
+      if (event.shiftKey) toggleSelect(node.id);
+      else if (!selectedIds.has(node.id)) selectOnly(node.id);
+    });
+    els.nodeLayer.appendChild(element);
+  }
+
+  function renderRegularNode(node) {
+    const element = document.createElement('article');
+    element.className = `node node-${node.type}${selectedIds.has(node.id) ? ' selected' : ''}${selectedIds.has(node.id) && selectedIds.size > 1 ? ' multi' : ''}`;
+    element.dataset.nodeId = node.id;
+    element.style.setProperty('--x', `${node.x}px`);
+    element.style.setProperty('--y', `${node.y}px`);
+    element.style.setProperty('--w', `${node.w}px`);
+    element.style.setProperty('--h', `${node.h}px`);
+    element.innerHTML = `
+      <button class="node-port input" data-port="input" title="Input"></button>
+      <button class="node-port output" data-port="output" title="Output"></button>
+      <div class="node-head">
+        <div class="node-title-wrap">
+          <div class="node-type">${escapeHtml(typeNames[node.type] || node.type)}</div>
+          <div class="node-title">${escapeHtml(node.title)}</div>
+        </div>
+        <div class="node-tools">
+          <button data-node-action="run" title="Run">▶</button>
+          <button data-node-action="delete" title="Delete">×</button>
+        </div>
+      </div>
+      <div class="node-body">${nodeBodyHtml(node)}</div>
+      <button class="node-resize" type="button" title="Resize" aria-label="Resize"></button>
+    `;
+
+    element.addEventListener('pointerdown', (event) => {
+      if (event.target.closest('input,textarea,button,select,video,.node-port,.node-media')) return;
+      event.stopPropagation();
+      if (event.shiftKey) toggleSelect(node.id);
+      else if (!selectedIds.has(node.id)) selectOnly(node.id);
+    });
+    element.querySelector('.node-head').addEventListener('pointerdown', (event) => startNodeDrag(event, node, false));
+    element.querySelector('.node-resize').addEventListener('pointerdown', (event) => startNodeResize(event, node));
+    element.querySelector('.node-port.output').addEventListener('pointerdown', (event) => startEdgeDrag(event, node));
+    element.querySelector('.node-port.input').addEventListener('pointerup', (event) => finishEdgeDrag(event, node));
+    bindNodeControls(element, node);
+    els.nodeLayer.appendChild(element);
+  }
+
+  function nodeBodyHtml(node) {
+    if (node.type === 'prompt') return promptNodeHtml(node);
+    if (node.type === 'loop') return loopNodeHtml(node);
+    if (node.type === 'llm') return llmNodeHtml(node);
+    if (node.type === 'image') return imageNodeHtml(node);
+    if (node.type === 'video') return videoNodeHtml(node);
+    if (node.type === 'output') return outputNodeHtml(node);
+    return promptNodeHtml(node);
+  }
+
+  function upstreamPreviewHtml(node) {
+    const upstream = upstreamNodes(node.id);
+    if (!upstream.length) return '<div class="node-empty">No upstream nodes connected.</div>';
+    return upstream.map((item) => {
+      const media = mediaHtml(item, true);
+      const text = nodeContent(item).slice(0, 160);
+      return `
+        <div class="input-preview-item">
+          ${media || '<div class="input-preview-icon">TXT</div>'}
+          <div><strong>${escapeHtml(item.title || typeNames[item.type])}</strong><span>${escapeHtml(text || 'No text output yet.')}</span></div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function resultHtml(node) {
+    const media = mediaHtml(node);
+    const text = node.resultText ? `<div class="node-result">${escapeHtml(node.resultText)}</div>` : '';
+    return media || text ? `<div class="node-result-stack">${media}${text}</div>` : '';
+  }
+
+  function nodeStatusText(node, fallback) {
+    if (node.status === 'queued' || node.status === 'running') return 'Running';
+    if (node.status === 'failed') return 'Failed';
+    if (node.status === 'succeeded') return 'Done';
+    return fallback;
+  }
+
+  function generationProgress(node) {
+    if (node.status === 'succeeded') return 100;
+    if (node.status === 'failed') return clamp(Math.round(node.progress || 0), 1, 99);
+    if (node.status !== 'queued' && node.status !== 'running') return 0;
+    const startedAt = Number(node.progressStartedAt || Date.now());
+    const elapsed = Math.max(0, (Date.now() - startedAt) / 1000);
+    const expectedSeconds = node.type === 'video' ? 240 : node.type === 'image' ? 150 : 60;
+    const estimated = 6 + (elapsed / expectedSeconds) * 89;
+    return clamp(Math.round(Math.max(node.progress || 0, estimated)), 6, 95);
+  }
+
+  function stageProgressHtml(node) {
+    if (!['queued', 'running', 'succeeded', 'failed'].includes(node.status || '')) return '';
+    const percent = generationProgress(node);
+    return `
+      <div class="stage-progress" data-progress-node="${escapeHtml(node.id)}">
+        <div class="stage-progress-track">
+          <div class="stage-progress-fill" style="width:${percent}%"></div>
+        </div>
+        <span class="stage-progress-label">${percent}%</span>
+      </div>
+    `;
+  }
+
+  function renderProgressIndicators() {
+    document.querySelectorAll('[data-progress-node]').forEach((element) => {
+      const node = nodeById(element.dataset.progressNode);
+      if (!node) return;
+      const percent = generationProgress(node);
+      const fill = element.querySelector('.stage-progress-fill');
+      const label = element.querySelector('.stage-progress-label');
+      if (fill) fill.style.width = `${percent}%`;
+      if (label) label.textContent = `${percent}%`;
+    });
+  }
+
+  function syncProgressTicker() {
+    const hasRunning = state.nodes.some((node) => ['queued', 'running'].includes(node.status || ''));
+    if (hasRunning && !progressTimer) {
+      progressTimer = window.setInterval(renderProgressIndicators, 1000);
+    } else if (!hasRunning && progressTimer) {
+      window.clearInterval(progressTimer);
+      progressTimer = null;
+    }
+  }
+
+  function nodeStageHtml(node, kind, emptyTitle, emptyHint) {
+    const media = mediaHtml(node);
+    const text = node.resultText ? `<div class="node-stage-copy">${escapeHtml(node.resultText)}</div>` : '';
+    const hasResult = Boolean(media || text);
+    const icon = kind === 'video' ? '▶' : kind === 'image' ? '▧' : '≡';
+    return `
+      <section class="node-stage node-stage-${escapeHtml(kind)}">
+        <span class="stage-status ${escapeHtml(node.status || 'idle')}">${escapeHtml(nodeStatusText(node, hasResult ? 'Done' : 'Idle'))}</span>
+        <div class="node-stage-content">
+          ${hasResult ? `${media}${text}` : `
+            <div class="stage-placeholder">
+              <span class="stage-icon">${escapeHtml(icon)}</span>
+              <strong>${escapeHtml(emptyTitle)}</strong>
+              <small>${escapeHtml(emptyHint)}</small>
+            </div>
+          `}
+        </div>
+        ${stageProgressHtml(node)}
+      </section>
+    `;
+  }
+
+  function consoleRunButtonHtml(runLabel) {
+    return `<button class="console-run-button" data-node-action="run" title="${escapeHtml(runLabel)}">↑</button>`;
+  }
+
+  function toolButtonHtml(action, label) {
+    return `<button class="console-tool" type="button" data-tool-action="${escapeHtml(action)}">${escapeHtml(label)}</button>`;
+  }
+
+  function footerHtml(node, runLabel = 'Run') {
+    return `
+      <div class="node-footer">
+        <button class="node-action" data-node-action="run">${escapeHtml(runLabel)}</button>
+        <span class="node-status ${escapeHtml(node.status || '')}">${escapeHtml(node.status || 'idle')}</span>
+      </div>
+    `;
+  }
+
+  function promptNodeHtml(node) {
+    return `
+      ${nodeStageHtml(node, 'text', 'Text not generated', 'Write or connect content to this node.')}
+      <section class="node-console">
+        <div class="node-toolbar-row">
+          ${toolButtonHtml('write', 'Write')}
+          ${toolButtonHtml('textToVideo', 'Text to video')}
+          ${toolButtonHtml('imagePrompt', 'Image prompt')}
+          ${toolButtonHtml('musicPrompt', 'Music')}
+        </div>
+        <textarea class="node-textarea prompt-text console-input" spellcheck="false" data-field="prompt" placeholder="${escapeHtml(labels.promptText)}">${escapeHtml(node.prompt)}</textarea>
+        <div class="node-bottom-bar">
+          <span class="muted">Prompt node</span>
+          ${consoleRunButtonHtml('Summarize text')}
+        </div>
+      </section>
+    `;
+  }
+
+  function loopNodeHtml(node) {
+    return `
+      <label class="field-block"><span>Source prompt</span><textarea class="node-textarea" spellcheck="false" data-field="prompt">${escapeHtml(node.prompt)}</textarea></label>
+      <label class="field-block"><span>Loop items</span><textarea class="node-textarea loop-items" spellcheck="false" data-field="loopItems">${escapeHtml(node.loopItems || '')}</textarea></label>
+      ${resultHtml(node)}
+      ${footerHtml(node, 'Build loop')}
+    `;
+  }
+
+  function llmNodeHtml(node) {
+    return `
+      <div class="field-grid two">
+        <select data-field="llmProvider">${optionHtml(nodePresets.llmProviders, node.llmProvider)}</select>
+        <select data-field="model">${optionHtml(nodePresets.llmModels, node.model)}</select>
+      </div>
+      <label class="field-block compact"><span>System</span><textarea class="node-textarea system-text" spellcheck="false" data-field="systemPrompt">${escapeHtml(node.systemPrompt || '')}</textarea></label>
+      <div class="input-preview-list">${upstreamPreviewHtml(node)}</div>
+      <textarea class="node-textarea prompt-text" spellcheck="false" data-field="prompt" placeholder="${escapeHtml(labels.llmPrompt)}">${escapeHtml(node.prompt)}</textarea>
+      ${resultHtml(node)}
+      ${footerHtml(node, 'Run LLM')}
+    `;
+  }
+
+  function imageNodeHtml(node) {
+    return `
+      ${nodeStageHtml(node, 'image', 'Image not generated', 'Enter a prompt, upload a reference, or connect upstream nodes.')}
+      <section class="node-console">
+        <div class="node-toolbar-row">
+          ${toolButtonHtml('uploadReference', 'Upload')}
+          ${toolButtonHtml('addReference', 'Reference')}
+          ${toolButtonHtml('stylePrompt', 'Style')}
+          ${toolButtonHtml('commonPrompt', 'Prompt tips')}
+          ${toolButtonHtml('cameraPrompt', 'Camera')}
+        </div>
+        <div class="input-preview-list compact-preview">${upstreamPreviewHtml(node)}</div>
+        <textarea class="node-textarea prompt-text console-input" spellcheck="false" data-field="prompt" placeholder="${escapeHtml(labels.imagePrompt)}">${escapeHtml(node.prompt)}</textarea>
+        <div class="node-bottom-bar image-bottom-bar">
+          <select data-field="apiProvider">${optionHtml(nodePresets.imageProviders, node.apiProvider)}</select>
+          <select data-field="model">${optionHtml(nodePresets.imageModels, node.model)}</select>
+          <select data-field="ratio">${optionHtml(nodePresets.ratios, node.ratio)}</select>
+          <select data-field="quality">${optionHtml(nodePresets.qualities, node.quality)}</select>
+          <input data-field="count" type="number" min="1" max="8" value="${escapeHtml(node.count || 1)}">
+          ${consoleRunButtonHtml('Generate image')}
+        </div>
+      </section>
+    `;
+  }
+
+  function videoNodeHtml(node) {
+    const fps = Number(node.outputFps || 0);
+    return `
+      ${nodeStageHtml(node, 'video', 'Video not generated', 'Enter a shot prompt, upload media, or connect upstream nodes.')}
+      <section class="node-console">
+        <div class="node-toolbar-row mode-row">
+          ${chipHtml('text_to_video', 'Text video', node.videoMode === 'text_to_video', 'videoMode')}
+          ${chipHtml('image_to_video', 'Image video', node.videoMode === 'image_to_video', 'videoMode')}
+          ${chipHtml('video_to_video', 'Video to video', node.videoMode === 'video_to_video', 'videoMode')}
+          ${chipHtml('firstLastFrame', 'First/last frame', !!node.firstLastFrame, 'toggle')}
+        </div>
+        <div class="node-toolbar-row">
+          ${toolButtonHtml('markShot', 'Shot')}
+          ${toolButtonHtml('effectPrompt', 'Effect')}
+          ${toolButtonHtml('characterRef', 'Character')}
+          ${toolButtonHtml('addReference', 'Reference')}
+        </div>
+        <div class="input-preview-list compact-preview">${upstreamPreviewHtml(node)}</div>
+        <textarea class="node-textarea prompt-text console-input" spellcheck="false" data-field="prompt" placeholder="${escapeHtml(labels.videoPrompt)}">${escapeHtml(node.prompt)}</textarea>
+        <div class="node-bottom-bar video-bottom-bar">
+          <select data-field="apiProvider">${optionHtml(nodePresets.videoProviders, node.apiProvider)}</select>
+          <select data-field="model">${optionHtml(nodePresets.videoModels, node.model)}</select>
+          <select data-field="aspectRatio">${optionHtml(nodePresets.ratios, node.aspectRatio)}</select>
+          <select data-field="resolution">${optionHtml(nodePresets.resolutions, node.resolution)}</select>
+          <input data-field="duration" type="number" min="1" max="60" value="${escapeHtml(node.duration || 5)}">
+          <div class="fps-compact">
+            ${chipHtml('0', 'Base', fps === 0, 'outputFps')}
+            ${chipHtml('30', '30fps', fps === 30, 'outputFps')}
+            ${chipHtml('60', '60fps', fps === 60, 'outputFps')}
+          </div>
+          ${consoleRunButtonHtml('Generate video')}
+        </div>
+      </section>
+    `;
+  }
+
+  function outputNodeHtml(node) {
+    const media = mediaHtml(node);
+    const text = node.resultText || node.prompt;
+    return `
+      <textarea class="node-textarea prompt-text" spellcheck="false" data-field="prompt" placeholder="${escapeHtml(labels.outputPrompt)}">${escapeHtml(node.prompt)}</textarea>
+      <div class="output-grid">${media || '<div class="node-empty">Connect upstream nodes or run this output node.</div>'}</div>
+      ${text ? `<div class="node-result">${escapeHtml(text)}</div>` : ''}
+      ${footerHtml(node, 'Collect output')}
+    `;
+  }
+
+  function toolActionText(action) {
+    const snippets = {
+      write: 'Rewrite the input into clear production-ready text.',
+      textToVideo: 'Convert this text into a concise video generation prompt with subject, action, camera, environment, lighting, and motion.',
+      imagePrompt: 'Create a concise image prompt with subject, composition, style, lighting, lens, and negative constraints.',
+      musicPrompt: 'Create a short music prompt with mood, tempo, instrumentation, and usage timing.',
+      addReference: 'Use connected reference assets for identity, clothing, scene, style, and continuity.',
+      stylePrompt: 'Style: cinematic, clean composition, consistent character identity, detailed materials, controlled lighting.',
+      commonPrompt: 'Avoid extra limbs, distorted hands, unreadable text, inconsistent clothing, duplicate faces, and low-quality artifacts.',
+      cameraPrompt: 'Camera: describe shot size, lens, angle, movement, focus, depth of field, and framing.',
+      markShot: 'Shot note: define subject action, camera movement, scene transition, and key frame intent.',
+      effectPrompt: 'Effect: describe physical motion, particles, weather, lighting changes, and interaction with the subject.',
+      characterRef: 'Character reference: preserve face, hairstyle, outfit, body proportion, expression style, and continuity.'
+    };
+    return snippets[action] || '';
+  }
+  function handleToolAction(action, node) {
+    if (action === 'uploadReference') {
+      els.fileInput.click();
+      return;
+    }
+    const snippet = toolActionText(action);
+    if (!snippet) return;
+    node.prompt = [node.prompt, snippet].filter(Boolean).join(node.prompt ? '\n' : '');
+    renderAll();
+    setDirty();
+  }
+
+  function bindNodeControls(element, node) {
+    element.querySelectorAll('[data-field]').forEach((input) => {
+      const field = input.dataset.field;
+      const handler = () => {
+        if (input.type === 'number') {
+          node[field] = safeNumber(input.value, node[field] || 0);
+        } else {
+          node[field] = input.value;
+        }
+        setDirty();
+        renderInspector();
+        renderWorkflowSummary();
+      };
+      input.addEventListener(input.tagName === 'SELECT' ? 'change' : 'input', handler);
+    });
+    element.querySelectorAll('[data-chip-field]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        const field = button.dataset.chipField;
+        const value = button.dataset.chipValue;
+        if (field === 'toggle') node[value] = !node[value];
+        else if (field === 'outputFps') node[field] = Number(value) || 0;
+        else node[field] = value;
+        renderAll();
+        setDirty();
+      });
+    });
+    element.querySelectorAll('[data-tool-action]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        handleToolAction(button.dataset.toolAction, node);
+      });
+    });
+    element.querySelectorAll('[data-node-action="run"]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        selectOnly(node.id);
+        runNode(node).catch(showError);
+      });
+    });
+    element.querySelector('[data-node-action="delete"]').addEventListener('click', (event) => {
+      event.stopPropagation();
+      selectOnly(node.id);
+      deleteSelected();
+    });
+  }
+
+  function nodeRect(node) {
+    return { left: node.x, top: node.y, right: node.x + node.w, bottom: node.y + node.h };
+  }
+
+  function rectsIntersect(a, b) {
+    return a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+  }
+
+  function groupChildren(group) {
+    const rect = nodeRect(group);
+    return state.nodes.filter((node) => {
+      if (node.id === group.id || node.type === 'group') return false;
+      const child = nodeRect(node);
+      const centerX = child.left + node.w / 2;
+      const centerY = child.top + node.h / 2;
+      return centerX >= rect.left && centerX <= rect.right && centerY >= rect.top && centerY <= rect.bottom;
+    });
+  }
+
+  function startNodeDrag(event, node, includeGroupChildren) {
+    if (event.button !== 0 || event.target.closest('input,textarea,button,select,video,.node-port')) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (event.shiftKey) toggleSelect(node.id);
+    else if (!selectedIds.has(node.id)) selectOnly(node.id);
+
+    const movedNodes = new Map();
+    selectedNodes().forEach((item) => movedNodes.set(item.id, item));
+    if (includeGroupChildren) groupChildren(node).forEach((item) => movedNodes.set(item.id, item));
+    activeDrag = {
+      kind: 'node',
+      start: clientToWorld(event.clientX, event.clientY),
+      origins: [...movedNodes.values()].map((item) => ({ id: item.id, x: item.x, y: item.y }))
+    };
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', endPointerAction, { once: true });
+  }
+
+  function startGroupResize(event, node) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    selectOnly(node.id);
+    activeDrag = {
+      kind: 'resize-group',
+      start: clientToWorld(event.clientX, event.clientY),
+      id: node.id,
+      w: node.w,
+      h: node.h
+    };
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', endPointerAction, { once: true });
+  }
+
+  function startNodeResize(event, node) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    selectOnly(node.id);
+    activeDrag = {
+      kind: 'resize-node',
+      start: clientToWorld(event.clientX, event.clientY),
+      id: node.id,
+      w: node.w,
+      h: node.h
+    };
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', endPointerAction, { once: true });
+  }
+
+  function startPan(event) {
+    event.preventDefault();
+    activeDrag = {
+      kind: 'pan',
+      start: { x: event.clientX, y: event.clientY },
+      viewport: { ...state.viewport }
+    };
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', endPointerAction, { once: true });
+  }
+
+  function startMarquee(event) {
+    const point = clientToCanvas(event.clientX, event.clientY);
+    activeDrag = { kind: 'marquee', start: point, current: point };
+    els.selectionBox.classList.remove('hidden');
+    paintMarquee();
+    window.addEventListener('pointermove', onPointerMove);
+    window.addEventListener('pointerup', endPointerAction, { once: true });
+  }
+
+  function onPointerMove(event) {
+    if (!activeDrag) return;
+    if (activeDrag.kind === 'pan') {
+      state.viewport.x = activeDrag.viewport.x + event.clientX - activeDrag.start.x;
+      state.viewport.y = activeDrag.viewport.y + event.clientY - activeDrag.start.y;
+      applyViewport();
+      setDirty();
+      return;
+    }
+    if (activeDrag.kind === 'node') {
+      const point = clientToWorld(event.clientX, event.clientY);
+      const dx = point.x - activeDrag.start.x;
+      const dy = point.y - activeDrag.start.y;
+      activeDrag.origins.forEach((origin) => {
+        const node = nodeById(origin.id);
+        if (!node) return;
+        node.x = origin.x + dx;
+        node.y = origin.y + dy;
+        applyNodePosition(node);
+      });
+      scheduleEdges();
+      scheduleMinimapRender();
+      return;
+    }
+    if (activeDrag.kind === 'resize-group') {
+      const node = nodeById(activeDrag.id);
+      if (!node) return;
+      const point = clientToWorld(event.clientX, event.clientY);
+      node.w = Math.max(180, activeDrag.w + point.x - activeDrag.start.x);
+      node.h = Math.max(120, activeDrag.h + point.y - activeDrag.start.y);
+      applyNodePosition(node);
+      scheduleEdges();
+      scheduleMinimapRender();
+      return;
+    }
+    if (activeDrag.kind === 'resize-node') {
+      const node = nodeById(activeDrag.id);
+      if (!node) return;
+      const point = clientToWorld(event.clientX, event.clientY);
+      const min = defaultSize(node.type);
+      node.w = Math.max(Math.min(240, min.w), activeDrag.w + point.x - activeDrag.start.x);
+      node.h = Math.max(Math.min(180, min.h), activeDrag.h + point.y - activeDrag.start.y);
+      applyNodePosition(node);
+      scheduleEdges();
+      scheduleMinimapRender();
+      return;
+    }
+    if (activeDrag.kind === 'marquee') {
+      activeDrag.current = clientToCanvas(event.clientX, event.clientY);
+      paintMarquee();
+    }
+  }
+
+  function endPointerAction() {
+    if (!activeDrag) return;
+    const finished = activeDrag;
+    window.removeEventListener('pointermove', onPointerMove);
+    activeDrag = null;
+    if (finished.kind === 'marquee') {
+      const rect = marqueeWorldRect(finished);
+      const ids = state.nodes
+        .filter((node) => rectsIntersect(nodeRect(node), rect))
+        .map((node) => node.id);
+      selectMany(ids);
+      els.selectionBox.classList.add('hidden');
+    }
+    if (finished.kind !== 'marquee') {
+      renderInspector();
+      renderWorkflowSummary();
+      setDirty();
+    }
+  }
+
+  function paintMarquee() {
+    if (!activeDrag || activeDrag.kind !== 'marquee') return;
+    const a = activeDrag.start;
+    const b = activeDrag.current;
+    const left = Math.min(a.x, b.x);
+    const top = Math.min(a.y, b.y);
+    els.selectionBox.style.left = `${left}px`;
+    els.selectionBox.style.top = `${top}px`;
+    els.selectionBox.style.width = `${Math.abs(a.x - b.x)}px`;
+    els.selectionBox.style.height = `${Math.abs(a.y - b.y)}px`;
+  }
+
+  function marqueeWorldRect(marquee) {
+    const rect = els.canvasArea.getBoundingClientRect();
+    const left = Math.min(marquee.start.x, marquee.current.x);
+    const top = Math.min(marquee.start.y, marquee.current.y);
+    const right = Math.max(marquee.start.x, marquee.current.x);
+    const bottom = Math.max(marquee.start.y, marquee.current.y);
+    const a = clientToWorld(rect.left + left, rect.top + top);
+    const b = clientToWorld(rect.left + right, rect.top + bottom);
+    return { left: a.x, top: a.y, right: b.x, bottom: b.y };
+  }
+
+  function startEdgeDrag(event, source) {
+    if (event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    if (activeEdgeCleanup) activeEdgeCleanup();
+    selectOnly(source.id);
+    draftEdge = { source: source.id, point: clientToWorld(event.clientX, event.clientY) };
+    renderEdges();
+    const portEl = event.currentTarget;
+    try { portEl?.setPointerCapture?.(event.pointerId); } catch (_error) {}
+    const onMove = (moveEvent) => {
+      draftEdge = { source: source.id, point: clientToWorld(moveEvent.clientX, moveEvent.clientY) };
+      scheduleEdges();
+    };
+    const cleanup = () => {
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+      window.removeEventListener('pointercancel', onCancel);
+      window.removeEventListener('blur', onCancel);
+      try { portEl?.releasePointerCapture?.(event.pointerId); } catch (_error) {}
+      activeEdgeCleanup = null;
+    };
+    const onUp = (upEvent) => {
+      cleanup();
+      const target = document.elementFromPoint(upEvent.clientX, upEvent.clientY)?.closest?.('[data-node-id]');
+      const port = document.elementFromPoint(upEvent.clientX, upEvent.clientY)?.closest?.('.node-port.input');
+      if (target && port) addEdge(source.id, target.dataset.nodeId);
+      draftEdge = null;
+      renderAll();
+    };
+    const onCancel = () => {
+      cleanup();
+      draftEdge = null;
+      renderEdges();
+    };
+    activeEdgeCleanup = onCancel;
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp, { once: true });
+    window.addEventListener('pointercancel', onCancel, { once: true });
+    window.addEventListener('blur', onCancel, { once: true });
+  }
+
+  function finishEdgeDrag(event, target) {
+    if (!draftEdge || draftEdge.source === target.id) return;
+    event.preventDefault();
+    event.stopPropagation();
+    addEdge(draftEdge.source, target.id);
+    draftEdge = null;
+    renderAll();
+  }
+
+  function addEdge(source, target) {
+    if (!source || !target || source === target) return;
+    const sourceNode = nodeById(source);
+    const targetNode = nodeById(target);
+    if (!sourceNode || !targetNode || sourceNode.type === 'group' || targetNode.type === 'group') return;
+    if (state.edges.some((edge) => edge.source === source && edge.target === target)) return;
+    state.edges.push({ id: uid('edge'), source, target });
+    addLog({ level: 'info', title: 'Connection added', detail: `${sourceNode.title} -> ${targetNode.title}` });
+    setDirty();
+  }
+  function portPoint(node, side) {
+    const element = nodeElement(node.id);
+    const height = element && node.type !== 'group' ? element.offsetHeight : node.h;
+    return {
+      x: side === 'output' ? node.x + node.w : node.x,
+      y: node.y + height / 2
+    };
+  }
+
+  function edgePath(start, end) {
+    const distance = Math.abs(end.x - start.x);
+    const bend = Math.max(70, distance * 0.46);
+    return `M ${start.x} ${start.y} C ${start.x + bend} ${start.y}, ${end.x - bend} ${end.y}, ${end.x} ${end.y}`;
+  }
+
+  function scheduleEdges() {
+    if (edgeRaf) return;
+    edgeRaf = requestAnimationFrame(() => {
+      edgeRaf = 0;
+      renderEdges();
+    });
+  }
+
+  function renderEdges() {
+    els.edgeLayer.innerHTML = '';
+    state.edges.forEach((edge) => {
+      const source = nodeById(edge.source);
+      const target = nodeById(edge.target);
+      if (!source || !target || source.type === 'group' || target.type === 'group') return;
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('class', 'edge-path');
+      path.setAttribute('d', edgePath(portPoint(source, 'output'), portPoint(target, 'input')));
+      els.edgeLayer.appendChild(path);
+    });
+    if (draftEdge) {
+      const source = nodeById(draftEdge.source);
+      if (source) {
+        const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+        path.setAttribute('class', 'edge-path draft');
+        path.setAttribute('d', edgePath(portPoint(source, 'output'), draftEdge.point));
+        els.edgeLayer.appendChild(path);
+      }
+    }
+  }
+
+  function groupSelected() {
+    const items = selectedNodes().filter((node) => node.type !== 'group');
+    if (!items.length) return;
+    const left = Math.min(...items.map((node) => node.x)) - 38;
+    const top = Math.min(...items.map((node) => node.y)) - 46;
+    const right = Math.max(...items.map((node) => node.x + node.w)) + 38;
+    const bottom = Math.max(...items.map((node) => node.y + node.h)) + 38;
+    const group = normalizeNode({
+      id: uid('group'),
+      type: 'group',
+      title: `Group ${state.nodes.filter((node) => node.type === 'group').length + 1}`,
+      x: left,
+      y: top,
+      w: Math.max(220, right - left),
+      h: Math.max(160, bottom - top),
+      prompt: ''
+    });
+    state.nodes.unshift(group);
+    selectOnly(group.id);
+    addLog({ level: 'info', title: 'Group created', detail: `${items.length} nodes` });
+    renderAll();
+    setDirty();
+  }
+
+  function deleteSelected() {
+    if (!selectedIds.size) return;
+    if (!window.confirm(labels.deleteConfirm)) return;
+    const ids = new Set(selectedIds);
+    state.nodes = state.nodes.filter((node) => !ids.has(node.id));
+    state.edges = state.edges.filter((edge) => !ids.has(edge.source) && !ids.has(edge.target));
+    selectedIds.clear();
+    addLog({ level: 'info', title: 'Selection deleted', detail: `${ids.size} items` });
+    renderAll();
+    setDirty();
+  }
+
+  function renderInspector() {
+    const items = selectedNodes();
+    if (!items.length) {
+      els.nodeInspector.innerHTML = '<div class="muted">Select a node to edit its title, prompt, status, and task metadata.</div>';
+      return;
+    }
+    if (items.length > 1) {
+      els.nodeInspector.innerHTML = `
+        <div class="inspect-grid">
+          <div class="pill-row"><span class="pill">${items.length} selected</span></div>
+          <button id="inspectGroupBtn" class="small-button">Group selected</button>
+          <button id="inspectRunBtn" class="small-button">Run selected chain</button>
+          <button id="inspectDeleteBtn" class="danger-button">Delete selected</button>
+        </div>
+      `;
+      document.getElementById('inspectGroupBtn').addEventListener('click', groupSelected);
+      document.getElementById('inspectRunBtn').addEventListener('click', () => runChain().catch(showError));
+      document.getElementById('inspectDeleteBtn').addEventListener('click', deleteSelected);
+      return;
+    }
+    const node = items[0];
+    els.nodeInspector.innerHTML = `
+      <div class="inspect-grid">
+        <label>
+          <span class="inspect-label">Name</span>
+          <input id="inspectTitle" class="inspect-input" value="${escapeHtml(node.title)}" />
+        </label>
+        <div class="pill-row">
+          <span class="pill">${escapeHtml(typeNames[node.type] || node.type)}</span>
+          <span class="pill">${Math.round(node.x)}, ${Math.round(node.y)}</span>
+          ${node.type === 'group' ? `<span class="pill">${groupChildren(node).length} nodes</span>` : ''}
+        </div>
+        ${node.type !== 'group' ? `
+          <label>
+            <span class="inspect-label">Prompt / content</span>
+            <textarea id="inspectPrompt" class="inspect-input inspect-textarea">${escapeHtml(node.prompt)}</textarea>
+          </label>
+        ` : ''}
+        <div class="pill-row">
+          <button id="inspectRunBtn" class="small-button">${node.type === 'group' ? 'Run group' : 'Run node'}</button>
+          <button id="inspectDeleteBtn" class="danger-button">Delete</button>
+        </div>
+        <div class="muted">${escapeHtml(node.taskId ? `Task ID: ${node.taskId}` : 'No task bound yet')}</div>
+      </div>
+    `;
+    document.getElementById('inspectTitle').addEventListener('input', (event) => {
+      node.title = event.target.value;
+      renderNodes();
+      renderWorkflowSummary();
+      setDirty();
+    });
+    const prompt = document.getElementById('inspectPrompt');
+    if (prompt) {
+      prompt.addEventListener('input', (event) => {
+        node.prompt = event.target.value;
+        const card = nodeElement(node.id);
+        const textarea = card?.querySelector('[data-field="prompt"]');
+        if (textarea && textarea.value !== node.prompt) textarea.value = node.prompt;
+        renderWorkflowSummary();
+        setDirty();
+      });
+    }
+    document.getElementById('inspectRunBtn').addEventListener('click', () => runNode(node).catch(showError));
+    document.getElementById('inspectDeleteBtn').addEventListener('click', deleteSelected);
+  }
+
+  async function saveCanvas() {
+    if (!currentCanvas) return;
+    els.saveState.textContent = labels.saving;
+    const data = await api(`/api/canvases/${currentCanvas.id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name: currentCanvas.name, state })
+    });
+    currentCanvas = data.canvas;
+    addLog({ level: 'success', title: 'Canvas saved', detail: currentCanvas.name || labels.canvas });
+    setDirty(false);
+    renderCanvases();
+  }
+  function upstreamNodes(nodeId) {
+    return state.edges
+      .filter((edge) => edge.target === nodeId)
+      .map((edge) => nodeById(edge.source))
+      .filter(Boolean);
+  }
+
+  function downstreamNodes(nodeId) {
+    return state.edges
+      .filter((edge) => edge.source === nodeId)
+      .map((edge) => nodeById(edge.target))
+      .filter(Boolean);
+  }
+
+  function nodeContent(node) {
+    const pieces = [];
+    if (!node) return '';
+    if (node.title) pieces.push(`[${typeNames[node.type] || node.type}] ${node.title}`);
+    if (node.type === 'loop' && node.loopItems) pieces.push(renderLoopText(node));
+    if (node.prompt) pieces.push(node.prompt);
+    if (node.resultText) pieces.push(node.resultText);
+    if (node.resultUrl) pieces.push(node.resultUrl);
+    if (node.assetUrl) pieces.push(node.assetUrl);
+    return pieces.filter(Boolean).join('\n');
+  }
+
+  function upstreamContext(node) {
+    const upstream = upstreamNodes(node.id);
+    if (!upstream.length) return '';
+    return upstream.map((item, index) => `# Input ${index + 1}: ${typeNames[item.type] || item.type}\n${nodeContent(item)}`).join('\n\n');
+  }
+
+  function renderLoopText(node) {
+    const base = node.prompt || '';
+    const lines = String(node.loopItems || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+    if (!lines.length) return base;
+    return lines.map((line, index) => `#${index + 1} ${base}\n${line}`).join('\n\n');
+  }
+
+  function taskPrompt(node) {
+    const upstream = upstreamContext(node);
+    const own = node.prompt || defaultPrompt(node.type);
+    const params = taskParams(node);
+    return [upstream, `# Prompt\n${own}`, params].filter(Boolean).join('\n\n');
+  }
+
+  function taskParams(node) {
+    if (node.type === 'image') {
+      return `# Params\nprovider=${node.apiProvider}; model=${node.model}; ratio=${node.ratio}; quality=${node.quality}; count=${node.count || 1}`;
+    }
+    if (node.type === 'video') {
+      return `# Params\nprovider=${node.apiProvider}; model=${node.model}; mode=${node.videoMode}; duration=${node.duration}; aspect=${node.aspectRatio}; resolution=${node.resolution}; output_fps=${node.outputFps || 0}; enhance_prompt=${!!node.enhancePrompt}; fixed_camera=${!!node.cameraFixed}; audio=${!!node.generateAudio}`;
+    }
+    if (node.type === 'llm') {
+      return `# System\n${node.systemPrompt || ''}\n\n# Params\nprovider=${node.llmProvider}; model=${node.model}`;
+    }
+    return '';
+  }
+  function findUrl(value) {
+    if (!value) return '';
+    if (typeof value === 'string') return /^(https?:|data:|\/api\/assets\/)/.test(value) ? value : '';
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found = findUrl(item);
+        if (found) return found;
+      }
+      return '';
+    }
+    if (typeof value === 'object') {
+      for (const key of ['url', 'image_url', 'video_url', 'output_url', 'download_url']) {
+        if (typeof value[key] === 'string') return value[key];
+      }
+      for (const item of Object.values(value)) {
+        const found = findUrl(item);
+        if (found) return found;
+      }
+    }
+    return '';
+  }
+
+  function findBase64(value) {
+    if (!value) return '';
+    if (typeof value === 'object') {
+      for (const key of ['b64_json', 'base64', 'image_base64']) {
+        if (typeof value[key] === 'string') return value[key];
+      }
+      for (const item of Object.values(value)) {
+        const found = findBase64(item);
+        if (found) return found;
+      }
+    }
+    return '';
+  }
+
+  function applyTaskResult(node, task) {
+    node.status = task.status;
+    node.taskId = task.id;
+    const result = task.result || {};
+    if (task.status === 'failed') {
+      node.progress = generationProgress(node);
+      node.resultText = task.error || labels.failed;
+      return;
+    }
+    if (task.status !== 'succeeded') {
+      node.progress = generationProgress(node);
+      return;
+    }
+    node.progress = 100;
+    if (task.kind === 'llm') {
+      node.resultText = result.text || JSON.stringify(result.raw || result, null, 2);
+      node.resultKind = 'text';
+      return;
+    }
+    const url = findUrl(result);
+    const b64 = findBase64(result);
+    if (url) {
+      node.resultUrl = url;
+      node.resultKind = task.kind === 'video' ? 'video' : mediaKindForUrl(url, task.kind);
+      node.resultText = '';
+    } else if (b64) {
+      node.resultUrl = `data:image/png;base64,${b64}`;
+      node.resultKind = 'image';
+      node.resultText = '';
+    } else {
+      node.resultText = JSON.stringify(result.raw || result, null, 2);
+    }
+  }
+
+  function isLocalRunnable(node) {
+    return ['prompt', 'loop', 'output'].includes(node.type);
+  }
+
+  function isRemoteRunnable(node) {
+    return ['llm', 'image', 'video'].includes(node.type);
+  }
+
+  async function runSelectedNode() {
+    const node = selectedNodes()[0];
+    if (!node || node.type === 'group') {
+      window.alert(labels.selectRunnable);
+      return;
+    }
+    await runNode(node);
+  }
+
+  async function runNode(node) {
+    if (!node || node.type === 'group') {
+      window.alert(labels.selectRunnable);
+      return;
+    }
+    if (isLocalRunnable(node)) {
+      runLocalNode(node);
+      return;
+    }
+    if (!isRemoteRunnable(node)) {
+      window.alert(labels.selectRunnable);
+      return;
+    }
+    node.status = 'queued';
+    node.progress = 6;
+    node.progressStartedAt = Date.now();
+    node.resultText = '';
+    node.resultUrl = '';
+    addLog({ level: 'info', title: 'Node queued', detail: `${typeNames[node.type]} -> ${node.title}` });
+    renderAll();
+    const data = await api('/api/tasks', {
+      method: 'POST',
+      body: JSON.stringify({ kind: node.type === 'image' ? 'image' : node.type, prompt: taskPrompt(node) })
+    });
+    updateAccount({ ...me, credits: data.balance });
+    applyTaskResult(node, data.task);
+    renderAll();
+    setDirty();
+    pollTask(data.task.id, node.id).catch(showError);
+    await loadTasks();
+  }
+
+  function runLocalNode(node) {
+    if (node.type === 'loop') {
+      node.resultText = renderLoopText(node);
+    } else if (node.type === 'output') {
+      node.resultText = upstreamNodes(node.id).map(nodeContent).filter(Boolean).join('\n\n') || node.prompt || '';
+    } else {
+      node.resultText = upstreamContext(node) || node.prompt || '';
+    }
+    node.status = 'succeeded';
+    addLog({ level: 'success', title: 'Local node completed', detail: `${typeNames[node.type]} -> ${node.title}` });
+    renderAll();
+    setDirty();
+  }
+
+  async function pollTask(taskId, nodeId) {
+    for (let i = 0; i < 160; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, i < 4 ? 900 : 1600));
+      const data = await api(`/api/tasks/${taskId}`);
+      updateAccount({ ...me, credits: data.balance });
+      const node = nodeById(nodeId);
+      if (node) {
+        const before = node.status;
+        applyTaskResult(node, data.task);
+        if (before !== data.task.status && ['succeeded', 'failed'].includes(data.task.status)) {
+          addLog({
+            level: data.task.status === 'succeeded' ? 'success' : 'error',
+            title: data.task.status === 'succeeded' ? 'Task completed' : 'Task failed',
+            detail: `${typeNames[node.type]} -> ${node.title}`
+          });
+        }
+        renderAll();
+        setDirty();
+      }
+      if (['succeeded', 'failed'].includes(data.task.status)) {
+        await loadTasks();
+        return;
+      }
+    }
+    addLog({ level: 'error', title: 'Task polling timed out', detail: taskId });
+  }
+
+  async function runChain() {
+    const roots = selectedNodes().filter((node) => node.type !== 'group');
+    if (!roots.length) {
+      await runSelectedNode();
+      return;
+    }
+    const order = collectRunOrder(roots);
+    addLog({ level: 'info', title: 'Chain started', detail: `${order.length} nodes` });
+    for (const node of order) {
+      if (node.type === 'group') continue;
+      await runNode(node);
+      if (node.status === 'failed') break;
+      if (isRemoteRunnable(node)) {
+        await waitForNodeDone(node.id);
+      }
+    }
+    addLog({ level: 'success', title: 'Chain finished', detail: `${order.length} nodes` });
+  }
+  function collectRunOrder(roots) {
+    const seen = new Set();
+    const order = [];
+    const visit = (node) => {
+      if (!node || seen.has(node.id)) return;
+      seen.add(node.id);
+      order.push(node);
+      downstreamNodes(node.id).forEach(visit);
+    };
+    roots.sort((a, b) => a.x - b.x || a.y - b.y).forEach(visit);
+    return order.filter((node) => node.type !== 'group');
+  }
+
+  async function waitForNodeDone(nodeId) {
+    for (let i = 0; i < 180; i += 1) {
+      const node = nodeById(nodeId);
+      if (!node || ['succeeded', 'failed'].includes(node.status)) return;
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+    }
+  }
+
+  async function loadTasks() {
+    const data = await api('/api/tasks');
+    const tasks = data.tasks || [];
+    if (!tasks.length) {
+      els.taskList.innerHTML = `<div class="muted">${labels.noTasks}</div>`;
+      return;
+    }
+    els.taskList.innerHTML = '';
+    tasks.slice(0, 18).forEach((task) => {
+      const item = document.createElement('div');
+      item.className = `task-item ${escapeHtml(task.status || '')}`;
+      item.innerHTML = `<strong>${escapeHtml(task.kind)} / ${escapeHtml(task.status)}</strong><span>${escapeHtml(task.prompt || '').slice(0, 100)}</span>`;
+      els.taskList.appendChild(item);
+    });
+  }
+
+  async function uploadFile(file) {
+    if (!file || !currentCanvas || !currentProject) return;
+    const body = new FormData();
+    body.append('file', file);
+    const url = `/api/uploads?project_id=${encodeURIComponent(currentProject.id)}&canvas_id=${encodeURIComponent(currentCanvas.id)}`;
+    const data = await api(url, { method: 'POST', body });
+    const isVideo = String(file.type || '').startsWith('video/');
+    addNode(isVideo ? 'video' : 'image', {
+      title: data.asset.name || file.name || (isVideo ? 'Video asset' : 'Image asset'),
+      prompt: file.name || '',
+      assetUrl: data.asset.url,
+      resultUrl: data.asset.url,
+      resultKind: isVideo ? 'video' : 'image',
+      assetName: data.asset.name || file.name || ''
+    });
+    addLog({ level: 'success', title: 'File uploaded', detail: file.name || data.asset.name });
+  }
+  function renderAssets() {
+    const assets = state.nodes
+      .filter((node) => node.assetUrl || node.resultUrl)
+      .map((node) => ({
+        id: node.id,
+        title: node.assetName || node.title,
+        url: node.resultUrl || node.assetUrl,
+        kind: node.resultKind || mediaKindForUrl(node.resultUrl || node.assetUrl)
+      }));
+    if (!assets.length) {
+      els.assetList.innerHTML = `<div class="muted">${labels.noAssets}</div>`;
+      return;
+    }
+    els.assetList.innerHTML = assets.map((asset) => `
+      <button class="asset-item" type="button" data-select-node="${escapeHtml(asset.id)}">
+        ${asset.kind === 'video'
+          ? `<video src="${escapeHtml(asset.url)}" muted></video>`
+          : `<img src="${escapeHtml(asset.url)}" alt="">`}
+        <span>${escapeHtml(asset.title || 'asset')}</span>
+      </button>
+    `).join('');
+    els.assetList.querySelectorAll('[data-select-node]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const node = nodeById(button.dataset.selectNode);
+        if (!node) return;
+        selectOnly(node.id);
+        centerOnNode(node);
+      });
+    });
+  }
+
+  function addLog(entry) {
+    if (!state.logs) state.logs = [];
+    state.logs.push({
+      id: uid('log'),
+      at: new Date().toLocaleTimeString('zh-CN', { hour12: false }),
+      level: entry.level || 'info',
+      title: entry.title || 'Log',
+      detail: entry.detail || ''
+    });
+    state.logs = state.logs.slice(-80);
+    renderLogs();
+  }
+
+  function renderLogs() {
+    const logs = state.logs || [];
+    if (!logs.length) {
+      els.logList.innerHTML = `<div class="muted">${labels.noLogs}</div>`;
+      return;
+    }
+    els.logList.innerHTML = logs.slice().reverse().map((log) => `
+      <div class="log-item ${escapeHtml(log.level)}">
+        <strong>${escapeHtml(log.title)}<span>${escapeHtml(log.at)}</span></strong>
+        <p>${escapeHtml(log.detail)}</p>
+      </div>
+    `).join('');
+  }
+
+  function workflowPayload(selectedOnly = true) {
+    const selected = new Set(selectedIds);
+    const nodes = selectedOnly && selected.size
+      ? state.nodes.filter((node) => selected.has(node.id))
+      : state.nodes.filter((node) => node.type !== 'group');
+    const ids = new Set(nodes.map((node) => node.id));
+    return {
+      version: 1,
+      name: currentCanvas?.name || labels.canvas,
+      exported_at: new Date().toISOString(),
+      nodes,
+      edges: state.edges.filter((edge) => ids.has(edge.source) && ids.has(edge.target))
+    };
+  }
+
+  function renderWorkflowSummary() {
+    const payload = workflowPayload(true);
+    const total = payload.nodes.length;
+    const edges = payload.edges.length;
+    const byType = payload.nodes.reduce((acc, node) => {
+      acc[node.type] = (acc[node.type] || 0) + 1;
+      return acc;
+    }, {});
+    els.workflowSummary.innerHTML = `
+      <div class="workflow-stat"><strong>${total}</strong><span>${selectedIds.size ? 'Selected nodes' : 'Canvas nodes'}</span></div>
+      <div class="workflow-stat"><strong>${edges}</strong><span>Connections</span></div>
+      <div class="workflow-types">${Object.entries(byType).map(([type, count]) => `<span>${escapeHtml(typeNames[type] || type)} ${count}</span>`).join('') || '<span>No nodes</span>'}</div>
+    `;
+  }
+
+  function exportWorkflow() {
+    const payload = workflowPayload(true);
+    const text = JSON.stringify(payload, null, 2);
+    const blob = new Blob([text], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${(payload.name || 'canvas-workflow').replace(/[\\/:*?"<>|]+/g, '-')}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    addLog({ level: 'success', title: 'Workflow exported', detail: `${payload.nodes.length} nodes` });
+  }
+
+  async function copyWorkflowSummary() {
+    const payload = workflowPayload(true);
+    const summary = payload.nodes.map((node, index) => `${index + 1}. ${typeNames[node.type] || node.type} -> ${node.title}`).join('\n');
+    await copyText(summary || 'No nodes');
+    addLog({ level: 'success', title: 'Workflow summary copied', detail: `${payload.nodes.length} nodes` });
+  }
+
+  async function copyText(text) {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand('copy');
+    textarea.remove();
+  }
+  function centerOnNode(node) {
+    const rect = els.canvasArea.getBoundingClientRect();
+    state.viewport.x = rect.width / 2 - (node.x + node.w / 2) * state.viewport.scale;
+    state.viewport.y = rect.height / 2 - (node.y + node.h / 2) * state.viewport.scale;
+    applyViewport();
+    renderEdges();
+  }
+
+  function scrollPanelIntoView(id) {
+    document.getElementById(id)?.scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+
+  function hideAddMenu() {
+    addMenuWorldPoint = null;
+    els.addMenu.classList.add('hidden');
+  }
+
+  function showAddMenu(event) {
+    if (event.target.closest('.node,.group-node,.toolbar,.canvas-minimap,.add-menu')) return;
+    event.preventDefault();
+    const canvasPoint = clientToCanvas(event.clientX, event.clientY);
+    addMenuWorldPoint = clientToWorld(event.clientX, event.clientY);
+    const left = clamp(canvasPoint.x, 12, Math.max(12, els.canvasArea.clientWidth - 202));
+    const top = clamp(canvasPoint.y, 12, Math.max(12, els.canvasArea.clientHeight - 250));
+    els.addMenu.style.left = `${left}px`;
+    els.addMenu.style.top = `${top}px`;
+    els.addMenu.classList.remove('hidden');
+  }
+
+  function addNodeFromMenu(type) {
+    const point = addMenuWorldPoint || centerWorldPoint();
+    addNode(type, { x: point.x, y: point.y });
+    hideAddMenu();
+  }
+
+  function zoomAtCanvasPoint(canvasX, canvasY, nextScale) {
+    const rect = els.canvasArea.getBoundingClientRect();
+    const before = clientToWorld(rect.left + canvasX, rect.top + canvasY);
+    const scale = clamp(nextScale, MIN_ZOOM, MAX_ZOOM);
+    state.viewport.scale = scale;
+    state.viewport.x = canvasX - before.x * scale;
+    state.viewport.y = canvasY - before.y * scale;
+    applyViewport();
+    setDirty();
+  }
+
+  function zoomBy(factor) {
+    const rect = els.canvasArea.getBoundingClientRect();
+    zoomAtCanvasPoint(rect.width / 2, rect.height / 2, state.viewport.scale * factor);
+  }
+
+  function centerViewportOnWorld(worldX, worldY) {
+    const rect = els.canvasArea.getBoundingClientRect();
+    state.viewport.x = rect.width / 2 - worldX * state.viewport.scale;
+    state.viewport.y = rect.height / 2 - worldY * state.viewport.scale;
+    applyViewport();
+    setDirty();
+  }
+
+  function worldPointFromMinimap(clientX, clientY) {
+    if (!minimapLayout) renderMinimap();
+    if (!minimapLayout) return null;
+    const rect = els.minimapView.getBoundingClientRect();
+    const { bounds, scale, offsetX, offsetY } = minimapLayout;
+    return {
+      x: bounds.x + (clientX - rect.left - offsetX) / scale,
+      y: bounds.y + (clientY - rect.top - offsetY) / scale
+    };
+  }
+
+  function bindMinimapEvents() {
+    const recenter = (event) => {
+      const point = worldPointFromMinimap(event.clientX, event.clientY);
+      if (point) centerViewportOnWorld(point.x, point.y);
+    };
+    els.minimapView.addEventListener('pointerdown', (event) => {
+      event.preventDefault();
+      els.minimapView.setPointerCapture?.(event.pointerId);
+      recenter(event);
+      const onMove = (moveEvent) => recenter(moveEvent);
+      const onUp = () => {
+        els.minimapView.releasePointerCapture?.(event.pointerId);
+        window.removeEventListener('pointermove', onMove);
+      };
+      window.addEventListener('pointermove', onMove);
+      window.addEventListener('pointerup', onUp, { once: true });
+    });
+  }
+
+  function handleWheel(event) {
+    event.preventDefault();
+    const point = clientToCanvas(event.clientX, event.clientY);
+    zoomAtCanvasPoint(point.x, point.y, state.viewport.scale * Math.exp(-event.deltaY * 0.0012));
+  }
+
+  function bindEvents() {
+    els.toolbar.querySelectorAll('[data-add]').forEach((button) => {
+      button.addEventListener('click', () => addNode(button.dataset.add));
+    });
+    els.addMenu.querySelectorAll('[data-add-menu]').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        event.stopPropagation();
+        addNodeFromMenu(button.dataset.addMenu);
+      });
+    });
+    els.groupBtn.addEventListener('click', groupSelected);
+    els.runBtn.addEventListener('click', () => runSelectedNode().catch(showError));
+    els.runChainBtn.addEventListener('click', () => runChain().catch(showError));
+    els.saveBtn.addEventListener('click', () => saveCanvas().catch(showError));
+    els.workflowBtn.addEventListener('click', () => scrollPanelIntoView('workflowPanel'));
+    els.assetBtn.addEventListener('click', () => scrollPanelIntoView('assetPanel'));
+    els.logBtn.addEventListener('click', () => scrollPanelIntoView('logPanel'));
+    els.refreshAssetBtn.addEventListener('click', renderAssets);
+    els.clearLogBtn.addEventListener('click', () => {
+      state.logs = [];
+      renderLogs();
+      setDirty();
+    });
+    els.exportWorkflowBtn.addEventListener('click', exportWorkflow);
+    els.copyWorkflowBtn.addEventListener('click', () => copyWorkflowSummary().catch(showError));
+    els.backToOriginBtn.addEventListener('click', () => {
+      state.viewport = { x: 120, y: 80, scale: 1 };
+      applyViewport();
+      setDirty();
+    });
+    els.zoomOutBtn.addEventListener('click', () => zoomBy(1 / 1.25));
+    els.zoomResetBtn.addEventListener('click', () => {
+      const rect = els.canvasArea.getBoundingClientRect();
+      zoomAtCanvasPoint(rect.width / 2, rect.height / 2, 1);
+    });
+    els.zoomInBtn.addEventListener('click', () => zoomBy(1.25));
+    bindMinimapEvents();
+    els.uploadBtn.addEventListener('click', () => els.fileInput.click());
+    els.fileInput.addEventListener('change', () => {
+      const file = els.fileInput.files && els.fileInput.files[0];
+      els.fileInput.value = '';
+      uploadFile(file).catch(showError);
+    });
+    els.canvasArea.addEventListener('wheel', (event) => {
+      hideAddMenu();
+      handleWheel(event);
+    }, { passive: false });
+    els.canvasArea.addEventListener('dblclick', showAddMenu);
+    els.canvasArea.addEventListener('pointerdown', (event) => {
+      if (event.target.closest('.node,.group-node,.toolbar,.canvas-minimap,.add-menu')) return;
+      hideAddMenu();
+      els.canvasArea.focus();
+      if (event.button === 1 || spaceDown) startPan(event);
+      else if (event.button === 0) startMarquee(event);
+    });
+    els.canvasArea.addEventListener('dragover', (event) => event.preventDefault());
+    els.canvasArea.addEventListener('drop', (event) => {
+      event.preventDefault();
+      const file = event.dataTransfer.files && event.dataTransfer.files[0];
+      uploadFile(file).catch(showError);
+    });
+    els.newProjectBtn.addEventListener('click', async () => {
+      const name = window.prompt('New project name', labels.defaultProject);
+      if (!name) return;
+      const data = await api('/api/projects', { method: 'POST', body: JSON.stringify({ name }) });
+      projects.unshift(data.project);
+      await selectProject(data.project.id);
+    });
+    els.newCanvasBtn.addEventListener('click', async () => {
+      if (!currentProject) return;
+      const name = window.prompt('New canvas name', labels.canvasName);
+      if (!name) return;
+      const data = await api(`/api/projects/${currentProject.id}/canvases`, { method: 'POST', body: JSON.stringify({ name }) });
+      canvases.unshift(data.canvas);
+      await selectCanvas(data.canvas.id);
+    });
+    els.accountBtn.addEventListener('click', () => els.accountModal.classList.remove('hidden'));
+    els.closeAccount.addEventListener('click', () => els.accountModal.classList.add('hidden'));
+    els.logoutBtn.addEventListener('click', async () => {
+      await api('/api/auth/logout', { method: 'POST', body: JSON.stringify({}) });
+      location.href = '/login';
+    });
+    window.addEventListener('keydown', (event) => {
+      const editing = event.target && ['INPUT', 'TEXTAREA', 'SELECT'].includes(event.target.tagName);
+      if (event.code === 'Space' && !editing) {
+        spaceDown = true;
+        event.preventDefault();
+      }
+      if (event.key === 'Escape') hideAddMenu();
+      if (editing) return;
+      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedIds.size) {
+        event.preventDefault();
+        deleteSelected();
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'g') {
+        event.preventDefault();
+        groupSelected();
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') {
+        event.preventDefault();
+        saveCanvas().catch(showError);
+      }
+      if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+        event.preventDefault();
+        runChain().catch(showError);
+      }
+    });
+    window.addEventListener('keyup', (event) => {
+      if (event.code === 'Space') spaceDown = false;
+    });
+    window.addEventListener('resize', () => {
+      renderEdges();
+      scheduleMinimapRender();
+    });
+  }
+  async function init() {
+    syncWorldSize();
+    bindEvents();
+    applyViewport();
+    try {
+      const user = await loadMe();
+      if (!user) return;
+      await loadProjects();
+    } catch (error) {
+      showError(error);
+    }
+  }
+
+  init();
+})();

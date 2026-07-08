@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Canvas SaaS &#21019;&#20316;&#30011;&#24067;</title>
+  <link rel="stylesheet" href="/static/app.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand-row">
+        <div class="brand-mark">CS</div>
+        <div>
+          <strong>Canvas SaaS</strong>
+          <span>Commercial Clean Room</span>
+        </div>
+      </div>
+
+      <section class="side-section">
+        <div class="section-head">
+          <span>&#39033;&#30446;</span>
+          <button id="newProjectBtn" class="icon-button" title="&#26032;&#39033;&#30446;">+</button>
+        </div>
+        <div id="projectList" class="nav-list"></div>
+      </section>
+
+      <section class="side-section grow">
+        <div class="section-head">
+          <span>&#30011;&#24067;</span>
+          <button id="newCanvasBtn" class="icon-button" title="&#26032;&#30011;&#24067;">+</button>
+        </div>
+        <div id="canvasList" class="nav-list"></div>
+      </section>
+
+      <section class="side-section account-card">
+        <button class="account-button" id="accountBtn">
+          <span id="accountEmail">&#36134;&#21495;</span>
+          <strong id="creditText">0 &#28857;</strong>
+        </button>
+      </section>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button id="backToOriginBtn" class="round-button" title="&#22238;&#21040;&#30011;&#24067;">&#9679;</button>
+        <div class="title-block">
+          <strong id="canvasTitle">&#26410;&#36873;&#25321;&#30011;&#24067;</strong>
+          <span id="saveState">&#26410;&#20445;&#23384;</span>
+        </div>
+        <nav class="toolbar" aria-label="canvas tools">
+          <button data-add="prompt">&#25552;&#31034;&#35789;</button>
+          <button data-add="loop">&#24490;&#29615;</button>
+          <button data-add="llm">LLM</button>
+          <button data-add="image">API&#29983;&#25104;</button>
+          <button data-add="video">&#35270;&#39057;&#29983;&#25104;</button>
+          <button data-add="output">Output</button>
+          <button id="uploadBtn">&#19978;&#20256;</button>
+          <button id="groupBtn">&#20998;&#32452;</button>
+          <button id="runBtn" class="strong">&#36816;&#34892;&#33410;&#28857;</button>
+          <button id="runChainBtn">&#19968;&#38190;&#36816;&#34892;</button>
+          <button id="saveBtn">&#20445;&#23384;</button>
+          <button id="workflowBtn">&#24037;&#20316;&#27969;</button>
+          <button id="assetBtn">&#36164;&#20135;&#24211;</button>
+          <button id="logBtn">&#26085;&#24535;</button>
+        </nav>
+      </header>
+
+      <section id="canvasArea" class="canvas-area" tabindex="0">
+        <div id="world" class="world">
+          <svg id="edgeLayer" class="edge-layer" width="200000" height="200000" viewBox="0 0 200000 200000"></svg>
+          <div id="nodeLayer" class="node-layer"></div>
+        </div>
+        <div id="selectionBox" class="selection-box hidden"></div>
+        <div id="emptyHint" class="empty-hint">
+          <strong>&#24320;&#22987;&#21019;&#20316;</strong>
+          <span>&#28155;&#21152;&#33410;&#28857;&#65292;&#25302;&#21160;&#31471;&#21475;&#36830;&#32447;&#65292;&#25110;&#19978;&#20256;&#32032;&#26448;&#24314;&#31435;&#27969;&#31243;</span>
+        </div>
+        <div id="addMenu" class="add-menu hidden" role="menu" aria-label="添加节点">
+          <button type="button" data-add-menu="prompt">提示词</button>
+          <button type="button" data-add-menu="loop">循环</button>
+          <button type="button" data-add-menu="llm">LLM</button>
+          <button type="button" data-add-menu="image">API生成</button>
+          <button type="button" data-add-menu="video">视频生成</button>
+          <button type="button" data-add-menu="output">Output</button>
+        </div>
+        <div class="canvas-minimap" id="minimap" aria-label="缩放预览">
+          <div class="minimap-head">
+            <span>缩放预览</span>
+            <strong id="minimapZoom">100%</strong>
+          </div>
+          <div class="minimap-view" id="minimapView">
+            <div class="minimap-content" id="minimapContent"></div>
+            <div class="minimap-viewport" id="minimapViewport"></div>
+          </div>
+          <div class="minimap-actions">
+            <button id="zoomOutBtn" type="button" title="缩小">-</button>
+            <button id="zoomResetBtn" type="button" title="重置缩放">100%</button>
+            <button id="zoomInBtn" type="button" title="放大">+</button>
+          </div>
+        </div>
+        <div class="zoom-chip" id="zoomChip">100%</div>
+      </section>
+    </main>
+
+    <aside class="inspector">
+      <section class="panel" id="inspectPanel">
+        <div class="panel-title">选中</div>
+        <div id="nodeInspector" class="muted">&#36873;&#25321;&#33410;&#28857;&#25110;&#20998;&#32452;</div>
+      </section>
+      <section class="panel" id="taskPanel">
+        <div class="panel-title">任务</div>
+        <div id="taskList" class="task-list"></div>
+      </section>
+      <section class="panel" id="assetPanel">
+        <div class="panel-title">
+          <span>资产库</span>
+          <button id="refreshAssetBtn" class="mini-button" type="button">刷新</button>
+        </div>
+        <div id="assetList" class="asset-list"></div>
+      </section>
+      <section class="panel" id="workflowPanel">
+        <div class="panel-title">工作流</div>
+        <div id="workflowSummary" class="workflow-summary"></div>
+        <div class="panel-actions">
+          <button id="exportWorkflowBtn" class="small-button" type="button">导出选中 JSON</button>
+          <button id="copyWorkflowBtn" class="small-button" type="button">复制摘要</button>
+        </div>
+      </section>
+      <section class="panel" id="logPanel">
+        <div class="panel-title">
+          <span>日志</span>
+          <button id="clearLogBtn" class="mini-button" type="button">清空</button>
+        </div>
+        <div id="logList" class="log-list"></div>
+      </section>
+      <section class="panel">
+        <div class="panel-title">快捷键</div>
+        <div class="shortcut-list">
+          <span>Space + 拖动：平移</span>
+          <span>Ctrl+G：将选中节点打组</span>
+          <span>Delete：删除选中</span>
+          <span>Shift + 点击：多选</span>
+        </div>
+      </section>
+    </aside>
+  </div>
+
+  <div id="accountModal" class="modal hidden">
+    <div class="modal-card">
+      <button id="closeAccount" class="icon-close" aria-label="close">x</button>
+      <h2>&#29992;&#25143;&#20013;&#24515;</h2>
+      <p id="accountLine" class="muted"></p>
+      <div class="metric-row">
+        <div><span>&#28857;&#25968;&#20313;&#39069;</span><strong id="modalCredits">0</strong></div>
+        <div><span>&#36523;&#20221;</span><strong id="modalRole">&#29992;&#25143;</strong></div>
+      </div>
+      <div class="modal-actions">
+        <a id="adminLink" class="ghost-button hidden" href="/admin">&#21518;&#21488;&#31649;&#29702;</a>
+        <button id="logoutBtn" class="danger-button">&#36864;&#20986;&#30331;&#24405;</button>
+      </div>
+    </div>
+  </div>
+
+  <input id="fileInput" type="file" accept="image/*,video/*" hidden />
+  <script src="/static/app.js"></script>
+</body>
+</html>

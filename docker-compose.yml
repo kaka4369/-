@@ -1,0 +1,11 @@
+services:
+  canvas-saas:
+    build: .
+    ports:
+      - "3020:3020"
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./storage:/app/storage
+    restart: unless-stopped
