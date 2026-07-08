@@ -124,6 +124,9 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("width: min(100%, 560px)", css)
         self.assertIn("max-height: none", css)
         self.assertIn("align-self: center", css)
+        self.assertIn("border: 0", css)
+        self.assertIn("background: transparent", css)
+        self.assertIn("box-shadow: none", css)
         self.assertIn(".node-image .node-console", css)
         self.assertIn("max-height: none", css)
 
