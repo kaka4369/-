@@ -219,7 +219,7 @@
   function defaultSize(type) {
     if (type === 'group') return { w: 540, h: 340 };
     if (type === 'llm') return { w: 390, h: 410 };
-    if (type === 'image') return { w: 520, h: 520 };
+    if (type === 'image') return { w: 520, h: 620 };
     if (type === 'video') return { w: 560, h: 540 };
     if (type === 'output') return { w: 380, h: 300 };
     if (type === 'loop') return { w: 340, h: 300 };
@@ -228,7 +228,7 @@
 
   function minSize(type) {
     if (type === 'group') return { w: 180, h: 120 };
-    if (type === 'image') return { w: 360, h: 430 };
+    if (type === 'image') return { w: 380, h: 560 };
     if (type === 'video') return { w: 360, h: 430 };
     return { w: 240, h: 180 };
   }

@@ -40,7 +40,7 @@ class CanvasViewportUiTests(unittest.TestCase):
         js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
 
         self.assertIn("function minSize", js)
-        self.assertIn("if (type === 'image') return { w: 360, h: 430 }", js)
+        self.assertIn("if (type === 'image') return { w: 380, h: 560 }", js)
         self.assertIn("h: clamp(safeNumber(source.h, size.h), minimum.h, 1400)", js)
         self.assertIn("const min = minSize(node.type)", js)
         self.assertNotIn("node.h = Math.max(180, element.offsetHeight)", js)
@@ -118,10 +118,22 @@ class CanvasViewportUiTests(unittest.TestCase):
         css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
 
         self.assertIn(".node-image .node-stage-image", css)
-        self.assertIn("flex: 0 0 min(42%, 320px)", css)
-        self.assertIn("max-height: 320px", css)
+        self.assertIn("flex: 0 0 min(52%, 420px)", css)
+        self.assertIn("max-height: 420px", css)
         self.assertIn(".node-image .node-console", css)
         self.assertIn("max-height: none", css)
+
+    def test_image_node_uses_separate_preview_and_control_panels(self):
+        css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
+
+        self.assertIn(".node-image {", css)
+        self.assertIn("background: transparent", css)
+        self.assertIn(".node-image .node-head", css)
+        self.assertIn("width: max-content", css)
+        self.assertIn(".node-image .node-body", css)
+        self.assertIn("overflow: visible", css)
+        self.assertIn(".node-image.selected .node-stage-image", css)
+        self.assertIn(".node-image.selected .node-console", css)
 
     def test_generated_images_are_contained_and_click_to_preview(self):
         html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
