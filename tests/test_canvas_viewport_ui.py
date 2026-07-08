@@ -50,6 +50,18 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("addNode(type, { x:", js)
         self.assertIn("els.canvasArea.addEventListener('dblclick'", js)
 
+    def test_connection_drag_to_empty_canvas_opens_add_menu_and_auto_links(self):
+        css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
+        js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("let pendingEdgeConnection = null", js)
+        self.assertIn("function showConnectionAddMenu", js)
+        self.assertIn("pendingEdgeConnection = { source: source.id }", js)
+        self.assertIn("showConnectionAddMenu(upEvent.clientX, upEvent.clientY)", js)
+        self.assertIn("const pendingConnection = pendingEdgeConnection", js)
+        self.assertIn("addEdge(pendingConnection.source, node.id)", js)
+        self.assertIn(".add-menu.connection-menu", css)
+
     def test_text_image_video_nodes_use_console_layout(self):
         css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
         js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")

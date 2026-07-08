@@ -141,6 +141,7 @@
   let currentView = 'canvas';
   let activeEdgeCleanup = null;
   let addMenuWorldPoint = null;
+  let pendingEdgeConnection = null;
   let dirty = false;
   let savingInFlight = null;
   let spaceDown = false;
@@ -1274,9 +1275,15 @@
     };
     const onUp = (upEvent) => {
       cleanup();
-      const target = document.elementFromPoint(upEvent.clientX, upEvent.clientY)?.closest?.('[data-node-id]');
-      const port = document.elementFromPoint(upEvent.clientX, upEvent.clientY)?.closest?.('.node-port.input');
-      if (target && port) addEdge(source.id, target.dataset.nodeId);
+      const dropTarget = document.elementFromPoint(upEvent.clientX, upEvent.clientY);
+      const target = dropTarget?.closest?.('[data-node-id]');
+      const port = dropTarget?.closest?.('.node-port.input');
+      if (target && port) {
+        addEdge(source.id, target.dataset.nodeId);
+      } else {
+        pendingEdgeConnection = { source: source.id };
+        showConnectionAddMenu(upEvent.clientX, upEvent.clientY);
+      }
       draftEdge = null;
       renderAll();
     };
@@ -2156,24 +2163,48 @@
 
   function hideAddMenu() {
     addMenuWorldPoint = null;
+    pendingEdgeConnection = null;
+    els.addMenu.classList.remove('connection-menu');
     els.addMenu.classList.add('hidden');
+  }
+
+  function positionAddMenu(clientX, clientY) {
+    const canvasPoint = clientToCanvas(clientX, clientY);
+    addMenuWorldPoint = clientToWorld(clientX, clientY);
+    const left = clamp(canvasPoint.x, 12, Math.max(12, els.canvasArea.clientWidth - 202));
+    const top = clamp(canvasPoint.y, 12, Math.max(12, els.canvasArea.clientHeight - 250));
+    els.addMenu.style.left = `${left}px`;
+    els.addMenu.style.top = `${top}px`;
   }
 
   function showAddMenu(event) {
     if (event.target.closest('.node,.group-node,.toolbar,.canvas-minimap,.add-menu')) return;
     event.preventDefault();
-    const canvasPoint = clientToCanvas(event.clientX, event.clientY);
-    addMenuWorldPoint = clientToWorld(event.clientX, event.clientY);
-    const left = clamp(canvasPoint.x, 12, Math.max(12, els.canvasArea.clientWidth - 202));
-    const top = clamp(canvasPoint.y, 12, Math.max(12, els.canvasArea.clientHeight - 250));
-    els.addMenu.style.left = `${left}px`;
-    els.addMenu.style.top = `${top}px`;
+    pendingEdgeConnection = null;
+    els.addMenu.classList.remove('connection-menu');
+    positionAddMenu(event.clientX, event.clientY);
+    els.addMenu.classList.remove('hidden');
+  }
+
+  function showConnectionAddMenu(clientX, clientY) {
+    const source = pendingEdgeConnection?.source ? nodeById(pendingEdgeConnection.source) : null;
+    if (!source) {
+      pendingEdgeConnection = null;
+      return;
+    }
+    positionAddMenu(clientX, clientY);
+    els.addMenu.classList.add('connection-menu');
     els.addMenu.classList.remove('hidden');
   }
 
   function addNodeFromMenu(type) {
     const point = addMenuWorldPoint || centerWorldPoint();
-    addNode(type, { x: point.x, y: point.y });
+    const pendingConnection = pendingEdgeConnection;
+    const node = addNode(type, { x: point.x, y: point.y });
+    if (pendingConnection?.source) {
+      addEdge(pendingConnection.source, node.id);
+      renderAll();
+    }
     hideAddMenu();
   }
 
