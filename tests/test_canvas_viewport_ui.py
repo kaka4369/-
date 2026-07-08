@@ -152,14 +152,24 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("els.railAssetBtn?.addEventListener('click', toggleAssetPage)", js)
         self.assertIn("els.assetBtn.addEventListener('click', toggleAssetPage)", js)
 
-    def test_left_rail_exposes_new_canvas_action(self):
+    def test_new_canvas_uses_in_page_modal_not_left_rail_prompt(self):
         html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
+        css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
         js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
 
-        self.assertIn('id="leftNewCanvasBtn"', html)
-        self.assertIn("async function createCanvasFromPrompt", js)
-        self.assertIn("els.leftNewCanvasBtn?.addEventListener('click'", js)
-        self.assertIn("await createCanvasFromPrompt()", js)
+        self.assertNotIn('id="leftNewCanvasBtn"', html)
+        self.assertIn('id="canvasCreateModal"', html)
+        self.assertIn('id="canvasCreateForm"', html)
+        self.assertIn('id="canvasNameInput"', html)
+        self.assertIn(".canvas-create-card", css)
+        self.assertIn(".modal-field", css)
+        self.assertIn("function showCreateCanvasModal", js)
+        self.assertIn("async function createCanvasWithName", js)
+        self.assertIn("els.newCanvasBtn.addEventListener('click'", js)
+        self.assertIn("showCreateCanvasModal()", js)
+        self.assertIn("createCanvasWithName(els.canvasNameInput.value)", js)
+        self.assertNotIn("window.prompt('新画布名称'", js)
+        self.assertNotIn("leftNewCanvasBtn", js)
 
     def test_image_result_preview_is_visually_balanced(self):
         css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
@@ -292,7 +302,7 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("function renderAssetSidebarSummary", js)
         self.assertIn('id="assetDrawer"', html)
         self.assertIn('id="assetDrawerGrid"', html)
-        self.assertIn('id="leftNewCanvasBtn"', html)
+        self.assertNotIn('id="leftNewCanvasBtn"', html)
         self.assertIn(".asset-page", css)
         self.assertIn(".asset-drawer-grid", css)
         self.assertIn(".asset-grid", css)

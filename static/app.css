@@ -77,10 +77,6 @@ a { color: inherit; text-decoration: none; }
   background: var(--primary);
   color: #fff;
 }
-.rail-primary {
-  font-size: 25px;
-}
-
 .sidebar,
 .inspector {
   min-width: 0;
@@ -435,6 +431,7 @@ a { color: inherit; text-decoration: none; }
 .toolbar button,
 .ghost-button,
 .danger-button,
+.primary-button,
 .node-action,
 .small-button {
   min-height: 36px;
@@ -448,6 +445,7 @@ a { color: inherit; text-decoration: none; }
 }
 .toolbar button:hover,
 .ghost-button:hover,
+.primary-button:hover,
 .node-action:hover,
 .small-button:hover {
   border-color: var(--line-strong);
@@ -458,6 +456,12 @@ a { color: inherit; text-decoration: none; }
   color: #fff;
   background: var(--primary);
   border-color: var(--primary);
+}
+.primary-button:hover,
+.primary-button:focus-visible {
+  color: #fff;
+  background: #1c2a40;
+  border-color: #1c2a40;
 }
 .toolbar button.active {
   color: #fff;
@@ -1990,6 +1994,43 @@ a { color: inherit; text-decoration: none; }
   background: var(--panel);
   box-shadow: var(--shadow);
   padding: 28px;
+}
+.canvas-create-card {
+  display: grid;
+  gap: 16px;
+}
+.modal-kicker {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 950;
+}
+.modal-card h2 {
+  margin: 0;
+  font-size: 22px;
+}
+.modal-field {
+  display: grid;
+  gap: 8px;
+}
+.modal-field span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+.modal-field input {
+  width: 100%;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--panel-2);
+  color: var(--ink);
+  padding: 0 12px;
+  outline: none;
+}
+.modal-field input:focus {
+  border-color: var(--accent);
+  background: #fff;
+  box-shadow: 0 0 0 3px rgba(47, 109, 246, 0.12);
 }
 .icon-close {
   position: absolute;

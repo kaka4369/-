@@ -9,7 +9,6 @@
 <body>
   <div class="app-shell">
     <nav class="quick-rail" aria-label="&#24555;&#25463;&#24037;&#20855;">
-      <button id="leftNewCanvasBtn" class="rail-button rail-primary" type="button" title="&#26032;&#22686;&#30011;&#24067;">+</button>
       <button id="railAssetBtn" class="rail-button" type="button" title="&#32032;&#26448;&#24211;">&#24211;</button>
     </nav>
 
@@ -250,6 +249,22 @@
       <button class="icon-close" type="button" data-preview-close aria-label="关闭">x</button>
       <img id="mediaPreviewImage" alt="完整图片" />
     </div>
+  </div>
+
+  <div id="canvasCreateModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="canvasCreateTitle">
+    <form id="canvasCreateForm" class="modal-card canvas-create-card">
+      <button id="canvasCreateCloseBtn" class="icon-close" type="button" aria-label="关闭">x</button>
+      <span class="modal-kicker">新建画布</span>
+      <h2 id="canvasCreateTitle">创建新画布</h2>
+      <label class="modal-field">
+        <span>画布名称</span>
+        <input id="canvasNameInput" type="text" name="canvas_name" maxlength="48" autocomplete="off" required />
+      </label>
+      <div class="modal-actions">
+        <button id="canvasCreateCancelBtn" class="ghost-button" type="button">取消</button>
+        <button class="primary-button" type="submit">创建</button>
+      </div>
+    </form>
   </div>
 
   <input id="fileInput" type="file" accept="image/*,video/*" hidden />

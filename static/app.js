@@ -85,7 +85,12 @@
     assetVideoCount: document.getElementById('assetVideoCount'),
     backToOriginBtn: document.getElementById('backToOriginBtn'),
     canvasArea: document.getElementById('canvasArea'),
+    canvasCreateCancelBtn: document.getElementById('canvasCreateCancelBtn'),
+    canvasCreateCloseBtn: document.getElementById('canvasCreateCloseBtn'),
+    canvasCreateForm: document.getElementById('canvasCreateForm'),
+    canvasCreateModal: document.getElementById('canvasCreateModal'),
     canvasList: document.getElementById('canvasList'),
+    canvasNameInput: document.getElementById('canvasNameInput'),
     canvasTitle: document.getElementById('canvasTitle'),
     clearLogBtn: document.getElementById('clearLogBtn'),
     closeAccount: document.getElementById('closeAccount'),
@@ -96,7 +101,6 @@
     exportWorkflowBtn: document.getElementById('exportWorkflowBtn'),
     fileInput: document.getElementById('fileInput'),
     groupBtn: document.getElementById('groupBtn'),
-    leftNewCanvasBtn: document.getElementById('leftNewCanvasBtn'),
     logBtn: document.getElementById('logBtn'),
     logList: document.getElementById('logList'),
     logoutBtn: document.getElementById('logoutBtn'),
@@ -2475,14 +2479,29 @@
     zoomAtCanvasPoint(point.x, point.y, state.viewport.scale * Math.exp(-event.deltaY * 0.0012));
   }
 
-  async function createCanvasFromPrompt() {
+  function showCreateCanvasModal() {
     if (!currentProject) return;
-    const name = window.prompt('新画布名称', labels.canvasName);
+    els.canvasNameInput.value = labels.canvasName;
+    els.canvasCreateModal.classList.remove('hidden');
+    window.setTimeout(() => {
+      els.canvasNameInput.focus();
+      els.canvasNameInput.select();
+    }, 0);
+  }
+
+  function hideCreateCanvasModal() {
+    els.canvasCreateModal.classList.add('hidden');
+  }
+
+  async function createCanvasWithName(name) {
+    if (!currentProject) return;
+    name = String(name || '').trim();
     if (!name) return;
     await saveCurrentCanvasIfDirty();
     const data = await api(`/api/projects/${currentProject.id}/canvases`, { method: 'POST', body: JSON.stringify({ name }) });
     canvases.unshift(data.canvas);
     hideAssetDrawer();
+    hideCreateCanvasModal();
     await selectCanvas(data.canvas.id);
   }
 
@@ -2563,6 +2582,15 @@
     els.mediaPreviewModal.addEventListener('click', (event) => {
       if (event.target === els.mediaPreviewModal) closeMediaPreview();
     });
+    els.canvasCreateCancelBtn.addEventListener('click', hideCreateCanvasModal);
+    els.canvasCreateCloseBtn.addEventListener('click', hideCreateCanvasModal);
+    els.canvasCreateModal.addEventListener('click', (event) => {
+      if (event.target === els.canvasCreateModal) hideCreateCanvasModal();
+    });
+    els.canvasCreateForm.addEventListener('submit', (event) => {
+      event.preventDefault();
+      createCanvasWithName(els.canvasNameInput.value).catch(showError);
+    });
     els.uploadBtn.addEventListener('click', () => els.fileInput.click());
     els.fileInput.addEventListener('change', () => {
       const file = els.fileInput.files && els.fileInput.files[0];
@@ -2596,9 +2624,8 @@
       await selectProject(data.project.id);
     });
     els.newCanvasBtn.addEventListener('click', async () => {
-      await createCanvasFromPrompt();
+      showCreateCanvasModal();
     });
-    els.leftNewCanvasBtn?.addEventListener('click', () => createCanvasFromPrompt().catch(showError));
     els.accountBtn.addEventListener('click', () => els.accountModal.classList.remove('hidden'));
     els.closeAccount.addEventListener('click', () => els.accountModal.classList.add('hidden'));
     els.logoutBtn.addEventListener('click', async () => {
@@ -2615,6 +2642,7 @@
         hideAddMenu();
         hideAssetDrawer();
         closeMediaPreview();
+        hideCreateCanvasModal();
       }
       if (editing) return;
       if ((event.key === 'Delete' || event.key === 'Backspace') && selectedEdgeId) {
