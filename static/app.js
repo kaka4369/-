@@ -226,6 +226,13 @@
     return { w: 460, h: 380 };
   }
 
+  function minSize(type) {
+    if (type === 'group') return { w: 180, h: 120 };
+    if (type === 'image') return { w: 360, h: 430 };
+    if (type === 'video') return { w: 360, h: 430 };
+    return { w: 240, h: 180 };
+  }
+
   function defaultPrompt(type) {
     if (type === 'llm') return labels.llmPrompt;
     if (type === 'image') return labels.imagePrompt;
@@ -287,6 +294,7 @@
     const source = raw && typeof raw === 'object' ? raw : {};
     const type = source.type || 'prompt';
     const size = defaultSize(type);
+    const minimum = minSize(type);
     const defaults = defaultsForType(type);
     const node = {
       ...defaults,
@@ -296,8 +304,8 @@
       title: source.title || typeNames[type] || 'Node',
       x: safeNumber(source.x, 0),
       y: safeNumber(source.y, 0),
-      w: clamp(safeNumber(source.w, size.w), 180, 1400),
-      h: clamp(safeNumber(source.h, size.h), 140, 1400),
+      w: clamp(safeNumber(source.w, size.w), minimum.w, 1400),
+      h: clamp(safeNumber(source.h, size.h), minimum.h, 1400),
       prompt: source.prompt || defaults.prompt || defaultPrompt(type),
       status: source.status || '',
       resultText: source.resultText || source.outputText || '',
@@ -667,10 +675,6 @@
     groups.forEach(renderGroupNode);
     regular.forEach(renderRegularNode);
     requestAnimationFrame(() => {
-      state.nodes.forEach((node) => {
-        const element = nodeElement(node.id);
-        if (element && node.type !== 'group') node.h = Math.max(180, element.offsetHeight);
-      });
       renderEdges();
       scheduleMinimapRender();
     });
@@ -1201,9 +1205,9 @@
       const node = nodeById(activeDrag.id);
       if (!node) return;
       const point = clientToWorld(event.clientX, event.clientY);
-      const min = defaultSize(node.type);
-      node.w = Math.max(Math.min(240, min.w), activeDrag.w + point.x - activeDrag.start.x);
-      node.h = Math.max(Math.min(180, min.h), activeDrag.h + point.y - activeDrag.start.y);
+      const min = minSize(node.type);
+      node.w = Math.max(min.w, activeDrag.w + point.x - activeDrag.start.x);
+      node.h = Math.max(min.h, activeDrag.h + point.y - activeDrag.start.y);
       applyNodePosition(node);
       scheduleEdges();
       scheduleMinimapRender();

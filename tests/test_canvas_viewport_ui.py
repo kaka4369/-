@@ -36,6 +36,15 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("activeDrag.kind === 'resize-node'", js)
         self.assertIn(".node-resize", css)
 
+    def test_rendering_does_not_autoshrink_node_height(self):
+        js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("function minSize", js)
+        self.assertIn("if (type === 'image') return { w: 360, h: 430 }", js)
+        self.assertIn("h: clamp(safeNumber(source.h, size.h), minimum.h, 1400)", js)
+        self.assertIn("const min = minSize(node.type)", js)
+        self.assertNotIn("node.h = Math.max(180, element.offsetHeight)", js)
+
     def test_canvas_double_click_opens_add_menu(self):
         html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
         css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
