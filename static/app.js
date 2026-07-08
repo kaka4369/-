@@ -1,51 +1,51 @@
-(() => {
+﻿(() => {
   const WORLD = { width: 200000, height: 200000 };
   const MIN_ZOOM = 0.02;
   const MAX_ZOOM = 8;
 
   const labels = {
-    account: 'Account',
-    admin: 'Admin',
-    canvas: 'Canvas',
-    canvasName: 'New Canvas',
-    defaultProject: 'Default Project',
-    deleteConfirm: 'Delete selected items?',
-    failed: 'Failed',
-    imagePrompt: 'Describe the image to generate. You can connect prompt, character, scene, or reference nodes.',
-    llmPrompt: 'Enter content to rewrite, split, or generate. Upstream node results will be included automatically.',
-    loading: 'Loading',
-    noAssets: 'No assets yet. Uploaded files and generated results will appear here.',
-    noCanvas: 'No canvas',
-    noLogs: 'No logs',
-    noProject: 'No project',
-    noTasks: 'No tasks',
-    outputPrompt: 'Collect upstream node results as final output, preview, or delivery notes.',
-    promptText: 'Enter prompt, script fragment, character setting, storyboard note, or asset note.',
-    running: 'Running',
-    saved: 'Saved',
-    saving: 'Saving',
-    selectRunnable: 'Select a runnable node',
-    unsaved: 'Unsaved',
-    user: 'User',
-    videoPrompt: 'Describe the video shot to generate. You can connect image, character, scene, or storyboard nodes.'
+    account: '账号',
+    admin: '后台',
+    canvas: '画布',
+    canvasName: '新画布',
+    defaultProject: '默认项目',
+    deleteConfirm: '确定删除选中的内容吗？',
+    failed: '失败',
+    imagePrompt: '描述要生成的画面，可以连接提示词、角色图、场景图或参考图。',
+    llmPrompt: '输入要改写、拆解或生成的内容；上游节点内容会自动带入。',
+    loading: '加载中',
+    noAssets: '暂无资产。上传文件和生成结果会出现在这里。',
+    noCanvas: '暂无画布',
+    noLogs: '暂无日志',
+    noProject: '暂无项目',
+    noTasks: '暂无任务',
+    outputPrompt: '收集上游节点结果，用于最终输出、预览或交付说明。',
+    promptText: '输入提示词、脚本片段、人物设定、分镜说明或素材说明。',
+    running: '运行中',
+    saved: '已保存',
+    saving: '保存中',
+    selectRunnable: '请选择可以运行的节点',
+    unsaved: '未保存',
+    user: '用户',
+    videoPrompt: '描述要生成的视频镜头，可以连接图片、角色、场景或分镜节点。'
   };
 
   const typeNames = {
-    prompt: 'Prompt',
-    loop: 'Loop',
+    prompt: '提示词',
+    loop: '循环',
     llm: 'LLM',
-    image: 'API Generate',
-    video: 'Video Generate',
-    output: 'Output',
-    group: 'Group'
+    image: 'API生成',
+    video: '视频生成',
+    output: '输出',
+    group: '分组'
   };
 
   const nodePresets = {
-    llmProviders: ['Guohe API', 'OpenAI Compatible', 'Custom'],
+    llmProviders: ['国禾API', 'OpenAI兼容', '自定义'],
     llmModels: ['gpt-5.5', 'deepseek-v4-pro', 'claude-opus-4-8', 'gemini-3.5-flash'],
-    imageProviders: ['Guohe API', 'OpenAI Compatible', 'Custom'],
+    imageProviders: ['国禾API', 'OpenAI兼容', '自定义'],
     imageModels: ['gpt-image-2', 'gemini-3.1-flash-image'],
-    videoProviders: ['Lingjing API', 'Volcengine', 'Custom'],
+    videoProviders: ['灵境API', '火山引擎', '自定义'],
     videoModels: ['seedance-2.0', 'seedance-2.0-1080', 'seedance-2.0-vision-1080', 'veo3.1-fast'],
     ratios: ['1:1', '3:4', '4:3', '9:16', '16:9', '21:9'],
     resolutions: ['Auto', '720p', '1080p'],
@@ -210,15 +210,15 @@
   function defaultsForType(type) {
     if (type === 'loop') {
       return {
-        prompt: 'Loop over multiple shots or assets.',
-        loopItems: 'Item 1: first variable set\nItem 2: second variable set\nItem 3: third variable set'
+        prompt: '按多组镜头或素材批量循环生成。',
+        loopItems: '第 1 项：第一组变量\n第 2 项：第二组变量\n第 3 项：第三组变量'
       };
     }
     if (type === 'llm') {
       return {
         llmProvider: nodePresets.llmProviders[0],
         model: nodePresets.llmModels[0],
-        systemPrompt: 'You are a reliable AI creative assistant. Use upstream content to produce clear actionable output.',
+        systemPrompt: '你是可靠的 AI 创作助手。请结合上游内容，输出清晰、可执行、适合继续生成图片或视频的结果。',
         mode: 'node',
         outputText: ''
       };
@@ -460,7 +460,7 @@
     if (!user) return;
     me = user;
     els.accountEmail.textContent = user.email || labels.account;
-    els.creditText.textContent = `${user.credits || 0} pts`;
+    els.creditText.textContent = `${user.credits || 0} 点`;
     els.accountLine.textContent = user.email || '';
     els.modalCredits.textContent = user.credits || 0;
     els.modalRole.textContent = user.is_admin ? labels.admin : labels.user;
@@ -563,7 +563,7 @@
     });
     state.nodes.push(node);
     selectOnly(node.id);
-    addLog({ level: 'info', title: 'Node added', detail: `${typeNames[type] || type} - ${node.title}` });
+    addLog({ level: 'info', title: '已添加节点', detail: `${typeNames[type] || type} - ${node.title}` });
     renderAll();
     setDirty();
     return node;
@@ -675,7 +675,7 @@
     element.style.setProperty('--h', `${node.h}px`);
     element.innerHTML = `
       <button class="node-port input" data-port="input" title="Input"></button>
-      <button class="node-port output" data-port="output" title="Output"></button>
+      <button class="node-port output" data-port="output" title="输出"></button>
       <div class="node-head">
         <div class="node-title-wrap">
           <div class="node-type">${escapeHtml(typeNames[node.type] || node.type)}</div>
@@ -683,7 +683,7 @@
         </div>
         <div class="node-tools">
           <button data-node-action="run" title="Run">▶</button>
-          <button data-node-action="delete" title="Delete">×</button>
+          <button data-node-action="delete" title="删除">×</button>
         </div>
       </div>
       <div class="node-body">${nodeBodyHtml(node)}</div>
@@ -723,7 +723,7 @@
       return `
         <div class="input-preview-item">
           ${media || '<div class="input-preview-icon">TXT</div>'}
-          <div><strong>${escapeHtml(item.title || typeNames[item.type])}</strong><span>${escapeHtml(text || 'No text output yet.')}</span></div>
+          <div><strong>${escapeHtml(item.title || typeNames[item.type])}</strong><span>${escapeHtml(text || '暂无文本输出')}</span></div>
         </div>
       `;
     }).join('');
@@ -736,9 +736,9 @@
   }
 
   function nodeStatusText(node, fallback) {
-    if (node.status === 'queued' || node.status === 'running') return 'Running';
-    if (node.status === 'failed') return 'Failed';
-    if (node.status === 'succeeded') return 'Done';
+    if (node.status === 'queued' || node.status === 'running') return '运行中';
+    if (node.status === 'failed') return '失败';
+    if (node.status === 'succeeded') return '完成';
     return fallback;
   }
 
@@ -792,10 +792,10 @@
     const media = mediaHtml(node);
     const text = node.resultText ? `<div class="node-stage-copy">${escapeHtml(node.resultText)}</div>` : '';
     const hasResult = Boolean(media || text);
-    const icon = kind === 'video' ? '▶' : kind === 'image' ? '▧' : '≡';
+    const icon = kind === 'video' ? 'VIDEO' : kind === 'image' ? 'IMG' : 'TXT';
     return `
       <section class="node-stage node-stage-${escapeHtml(kind)}">
-        <span class="stage-status ${escapeHtml(node.status || 'idle')}">${escapeHtml(nodeStatusText(node, hasResult ? 'Done' : 'Idle'))}</span>
+        <span class="stage-status ${escapeHtml(node.status || 'idle')}">${escapeHtml(nodeStatusText(node, hasResult ? '完成' : '待生成'))}</span>
         <div class="node-stage-content">
           ${hasResult ? `${media}${text}` : `
             <div class="stage-placeholder">
@@ -818,7 +818,7 @@
     return `<button class="console-tool" type="button" data-tool-action="${escapeHtml(action)}">${escapeHtml(label)}</button>`;
   }
 
-  function footerHtml(node, runLabel = 'Run') {
+  function footerHtml(node, runLabel = '运行') {
     return `
       <div class="node-footer">
         <button class="node-action" data-node-action="run">${escapeHtml(runLabel)}</button>
@@ -829,18 +829,18 @@
 
   function promptNodeHtml(node) {
     return `
-      ${nodeStageHtml(node, 'text', 'Text not generated', 'Write or connect content to this node.')}
+      ${nodeStageHtml(node, 'text', '文本未生成', '输入内容，或连接上游节点生成文本。')}
       <section class="node-console">
         <div class="node-toolbar-row">
-          ${toolButtonHtml('write', 'Write')}
-          ${toolButtonHtml('textToVideo', 'Text to video')}
-          ${toolButtonHtml('imagePrompt', 'Image prompt')}
-          ${toolButtonHtml('musicPrompt', 'Music')}
+          ${toolButtonHtml('write', '自己编写')}
+          ${toolButtonHtml('textToVideo', '文生视频')}
+          ${toolButtonHtml('imagePrompt', '图片反推提示词')}
+          ${toolButtonHtml('musicPrompt', '文字生音乐')}
         </div>
         <textarea class="node-textarea prompt-text console-input" spellcheck="false" data-field="prompt" placeholder="${escapeHtml(labels.promptText)}">${escapeHtml(node.prompt)}</textarea>
         <div class="node-bottom-bar">
-          <span class="muted">Prompt node</span>
-          ${consoleRunButtonHtml('Summarize text')}
+          <span class="muted">提示词节点</span>
+          ${consoleRunButtonHtml('汇总文本')}
         </div>
       </section>
     `;
@@ -848,10 +848,10 @@
 
   function loopNodeHtml(node) {
     return `
-      <label class="field-block"><span>Source prompt</span><textarea class="node-textarea" spellcheck="false" data-field="prompt">${escapeHtml(node.prompt)}</textarea></label>
-      <label class="field-block"><span>Loop items</span><textarea class="node-textarea loop-items" spellcheck="false" data-field="loopItems">${escapeHtml(node.loopItems || '')}</textarea></label>
+      <label class="field-block"><span>来源提示词</span><textarea class="node-textarea" spellcheck="false" data-field="prompt">${escapeHtml(node.prompt)}</textarea></label>
+      <label class="field-block"><span>循环项目</span><textarea class="node-textarea loop-items" spellcheck="false" data-field="loopItems">${escapeHtml(node.loopItems || '')}</textarea></label>
       ${resultHtml(node)}
-      ${footerHtml(node, 'Build loop')}
+      ${footerHtml(node, '生成循环')}
     `;
   }
 
@@ -865,20 +865,20 @@
       <div class="input-preview-list">${upstreamPreviewHtml(node)}</div>
       <textarea class="node-textarea prompt-text" spellcheck="false" data-field="prompt" placeholder="${escapeHtml(labels.llmPrompt)}">${escapeHtml(node.prompt)}</textarea>
       ${resultHtml(node)}
-      ${footerHtml(node, 'Run LLM')}
+      ${footerHtml(node, '运行 LLM')}
     `;
   }
 
   function imageNodeHtml(node) {
     return `
-      ${nodeStageHtml(node, 'image', 'Image not generated', 'Enter a prompt, upload a reference, or connect upstream nodes.')}
+      ${nodeStageHtml(node, 'image', '图片未生成', '输入提示词、上传参考图，或连接上游节点。')}
       <section class="node-console">
         <div class="node-toolbar-row">
-          ${toolButtonHtml('uploadReference', 'Upload')}
-          ${toolButtonHtml('addReference', 'Reference')}
-          ${toolButtonHtml('stylePrompt', 'Style')}
-          ${toolButtonHtml('commonPrompt', 'Prompt tips')}
-          ${toolButtonHtml('cameraPrompt', 'Camera')}
+          ${toolButtonHtml('uploadReference', '上传')}
+          ${toolButtonHtml('addReference', '参考')}
+          ${toolButtonHtml('stylePrompt', '风格')}
+          ${toolButtonHtml('commonPrompt', '常用提示词')}
+          ${toolButtonHtml('cameraPrompt', '摄影机控制')}
         </div>
         <div class="input-preview-list compact-preview">${upstreamPreviewHtml(node)}</div>
         <textarea class="node-textarea prompt-text console-input" spellcheck="false" data-field="prompt" placeholder="${escapeHtml(labels.imagePrompt)}">${escapeHtml(node.prompt)}</textarea>
@@ -888,7 +888,7 @@
           <select data-field="ratio">${optionHtml(nodePresets.ratios, node.ratio)}</select>
           <select data-field="quality">${optionHtml(nodePresets.qualities, node.quality)}</select>
           <input data-field="count" type="number" min="1" max="8" value="${escapeHtml(node.count || 1)}">
-          ${consoleRunButtonHtml('Generate image')}
+          ${consoleRunButtonHtml('生成图片')}
         </div>
       </section>
     `;
@@ -897,19 +897,19 @@
   function videoNodeHtml(node) {
     const fps = Number(node.outputFps || 0);
     return `
-      ${nodeStageHtml(node, 'video', 'Video not generated', 'Enter a shot prompt, upload media, or connect upstream nodes.')}
+      ${nodeStageHtml(node, 'video', '视频未生成', '输入镜头提示词、上传素材，或连接上游节点。')}
       <section class="node-console">
         <div class="node-toolbar-row mode-row">
-          ${chipHtml('text_to_video', 'Text video', node.videoMode === 'text_to_video', 'videoMode')}
-          ${chipHtml('image_to_video', 'Image video', node.videoMode === 'image_to_video', 'videoMode')}
-          ${chipHtml('video_to_video', 'Video to video', node.videoMode === 'video_to_video', 'videoMode')}
-          ${chipHtml('firstLastFrame', 'First/last frame', !!node.firstLastFrame, 'toggle')}
+          ${chipHtml('text_to_video', '文生视频', node.videoMode === 'text_to_video', 'videoMode')}
+          ${chipHtml('image_to_video', '图生视频', node.videoMode === 'image_to_video', 'videoMode')}
+          ${chipHtml('video_to_video', '视频转视频', node.videoMode === 'video_to_video', 'videoMode')}
+          ${chipHtml('firstLastFrame', '首尾帧', !!node.firstLastFrame, 'toggle')}
         </div>
         <div class="node-toolbar-row">
-          ${toolButtonHtml('markShot', 'Shot')}
-          ${toolButtonHtml('effectPrompt', 'Effect')}
-          ${toolButtonHtml('characterRef', 'Character')}
-          ${toolButtonHtml('addReference', 'Reference')}
+          ${toolButtonHtml('markShot', '标记')}
+          ${toolButtonHtml('effectPrompt', '特效')}
+          ${toolButtonHtml('characterRef', '角色库')}
+          ${toolButtonHtml('addReference', '参考')}
         </div>
         <div class="input-preview-list compact-preview">${upstreamPreviewHtml(node)}</div>
         <textarea class="node-textarea prompt-text console-input" spellcheck="false" data-field="prompt" placeholder="${escapeHtml(labels.videoPrompt)}">${escapeHtml(node.prompt)}</textarea>
@@ -920,11 +920,11 @@
           <select data-field="resolution">${optionHtml(nodePresets.resolutions, node.resolution)}</select>
           <input data-field="duration" type="number" min="1" max="60" value="${escapeHtml(node.duration || 5)}">
           <div class="fps-compact">
-            ${chipHtml('0', 'Base', fps === 0, 'outputFps')}
+            ${chipHtml('0', '原始', fps === 0, 'outputFps')}
             ${chipHtml('30', '30fps', fps === 30, 'outputFps')}
             ${chipHtml('60', '60fps', fps === 60, 'outputFps')}
           </div>
-          ${consoleRunButtonHtml('Generate video')}
+          ${consoleRunButtonHtml('生成视频')}
         </div>
       </section>
     `;
@@ -935,25 +935,25 @@
     const text = node.resultText || node.prompt;
     return `
       <textarea class="node-textarea prompt-text" spellcheck="false" data-field="prompt" placeholder="${escapeHtml(labels.outputPrompt)}">${escapeHtml(node.prompt)}</textarea>
-      <div class="output-grid">${media || '<div class="node-empty">Connect upstream nodes or run this output node.</div>'}</div>
+      <div class="output-grid">${media || '<div class="node-empty">连接上游节点，或运行输出节点。</div>'}</div>
       ${text ? `<div class="node-result">${escapeHtml(text)}</div>` : ''}
-      ${footerHtml(node, 'Collect output')}
+      ${footerHtml(node, '汇总输出')}
     `;
   }
 
   function toolActionText(action) {
     const snippets = {
-      write: 'Rewrite the input into clear production-ready text.',
-      textToVideo: 'Convert this text into a concise video generation prompt with subject, action, camera, environment, lighting, and motion.',
-      imagePrompt: 'Create a concise image prompt with subject, composition, style, lighting, lens, and negative constraints.',
-      musicPrompt: 'Create a short music prompt with mood, tempo, instrumentation, and usage timing.',
-      addReference: 'Use connected reference assets for identity, clothing, scene, style, and continuity.',
-      stylePrompt: 'Style: cinematic, clean composition, consistent character identity, detailed materials, controlled lighting.',
-      commonPrompt: 'Avoid extra limbs, distorted hands, unreadable text, inconsistent clothing, duplicate faces, and low-quality artifacts.',
-      cameraPrompt: 'Camera: describe shot size, lens, angle, movement, focus, depth of field, and framing.',
-      markShot: 'Shot note: define subject action, camera movement, scene transition, and key frame intent.',
-      effectPrompt: 'Effect: describe physical motion, particles, weather, lighting changes, and interaction with the subject.',
-      characterRef: 'Character reference: preserve face, hairstyle, outfit, body proportion, expression style, and continuity.'
+      write: '请将输入内容改写成清晰、可直接用于生产的文本。',
+      textToVideo: '请把这段文字转成视频生成提示词，包含主体、动作、镜头、环境、光线和运动方式。',
+      imagePrompt: '请生成图片提示词，包含主体、构图、风格、光线、镜头和负面约束。',
+      musicPrompt: '请生成音乐提示词，包含情绪、节奏、乐器、氛围和使用时段。',
+      addReference: '参考连接的素材，保持身份、服装、场景、风格和连续性一致。',
+      stylePrompt: '风格：电影感构图，角色身份一致，材质细节清晰，光线受控。',
+      commonPrompt: '负面约束：避免多余肢体、手部畸形、文字乱码、服装不一致、重复人脸、低质伪影。',
+      cameraPrompt: '摄影机：描述景别、镜头焦段、机位角度、运镜、焦点、景深和画面构图。',
+      markShot: '镜头说明：定义主体动作、镜头运动、场景转场和关键帧意图。',
+      effectPrompt: '特效：描述物理运动、粒子、天气、光影变化，以及与主体的互动。',
+      characterRef: '角色参考：保持五官、发型、服装、身材比例、表情风格和连续性。'
     };
     return snippets[action] || '';
   }
@@ -1318,7 +1318,7 @@
     const group = normalizeNode({
       id: uid('group'),
       type: 'group',
-      title: `Group ${state.nodes.filter((node) => node.type === 'group').length + 1}`,
+      title: `分组 ${state.nodes.filter((node) => node.type === 'group').length + 1}`,
       x: left,
       y: top,
       w: Math.max(220, right - left),
@@ -1327,7 +1327,7 @@
     });
     state.nodes.unshift(group);
     selectOnly(group.id);
-    addLog({ level: 'info', title: 'Group created', detail: `${items.length} nodes` });
+    addLog({ level: 'info', title: '已创建分组', detail: `${items.length} 个节点` });
     renderAll();
     setDirty();
   }
@@ -1339,7 +1339,7 @@
     state.nodes = state.nodes.filter((node) => !ids.has(node.id));
     state.edges = state.edges.filter((edge) => !ids.has(edge.source) && !ids.has(edge.target));
     selectedIds.clear();
-    addLog({ level: 'info', title: 'Selection deleted', detail: `${ids.size} items` });
+    addLog({ level: 'info', title: '已删除选中内容', detail: `${ids.size} 项` });
     renderAll();
     setDirty();
   }
@@ -1347,16 +1347,16 @@
   function renderInspector() {
     const items = selectedNodes();
     if (!items.length) {
-      els.nodeInspector.innerHTML = '<div class="muted">Select a node to edit its title, prompt, status, and task metadata.</div>';
+      els.nodeInspector.innerHTML = '<div class="muted">选择一个节点后，可以编辑名称、提示词、状态和任务信息。</div>';
       return;
     }
     if (items.length > 1) {
       els.nodeInspector.innerHTML = `
         <div class="inspect-grid">
-          <div class="pill-row"><span class="pill">${items.length} selected</span></div>
-          <button id="inspectGroupBtn" class="small-button">Group selected</button>
-          <button id="inspectRunBtn" class="small-button">Run selected chain</button>
-          <button id="inspectDeleteBtn" class="danger-button">Delete selected</button>
+          <div class="pill-row"><span class="pill">已选 ${items.length} 个</span></div>
+          <button id="inspectGroupBtn" class="small-button">选中内容打组</button>
+          <button id="inspectRunBtn" class="small-button">运行选中链路</button>
+          <button id="inspectDeleteBtn" class="danger-button">删除选中</button>
         </div>
       `;
       document.getElementById('inspectGroupBtn').addEventListener('click', groupSelected);
@@ -1368,25 +1368,25 @@
     els.nodeInspector.innerHTML = `
       <div class="inspect-grid">
         <label>
-          <span class="inspect-label">Name</span>
+          <span class="inspect-label">名称</span>
           <input id="inspectTitle" class="inspect-input" value="${escapeHtml(node.title)}" />
         </label>
         <div class="pill-row">
           <span class="pill">${escapeHtml(typeNames[node.type] || node.type)}</span>
           <span class="pill">${Math.round(node.x)}, ${Math.round(node.y)}</span>
-          ${node.type === 'group' ? `<span class="pill">${groupChildren(node).length} nodes</span>` : ''}
+          ${node.type === 'group' ? `<span class="pill">${groupChildren(node).length} 个节点</span>` : ''}
         </div>
         ${node.type !== 'group' ? `
           <label>
-            <span class="inspect-label">Prompt / content</span>
+            <span class="inspect-label">提示词 / 内容</span>
             <textarea id="inspectPrompt" class="inspect-input inspect-textarea">${escapeHtml(node.prompt)}</textarea>
           </label>
         ` : ''}
         <div class="pill-row">
-          <button id="inspectRunBtn" class="small-button">${node.type === 'group' ? 'Run group' : 'Run node'}</button>
-          <button id="inspectDeleteBtn" class="danger-button">Delete</button>
+          <button id="inspectRunBtn" class="small-button">${node.type === 'group' ? '运行分组' : '运行节点'}</button>
+          <button id="inspectDeleteBtn" class="danger-button">删除</button>
         </div>
-        <div class="muted">${escapeHtml(node.taskId ? `Task ID: ${node.taskId}` : 'No task bound yet')}</div>
+        <div class="muted">${escapeHtml(node.taskId ? `任务 ID：${node.taskId}` : '暂未绑定任务')}</div>
       </div>
     `;
     document.getElementById('inspectTitle').addEventListener('input', (event) => {
@@ -1418,7 +1418,7 @@
       body: JSON.stringify({ name: currentCanvas.name, state })
     });
     currentCanvas = data.canvas;
-    addLog({ level: 'success', title: 'Canvas saved', detail: currentCanvas.name || labels.canvas });
+    addLog({ level: 'success', title: '画布已保存', detail: currentCanvas.name || labels.canvas });
     setDirty(false);
     renderCanvases();
   }
@@ -1625,7 +1625,7 @@
         if (before !== data.task.status && ['succeeded', 'failed'].includes(data.task.status)) {
           addLog({
             level: data.task.status === 'succeeded' ? 'success' : 'error',
-            title: data.task.status === 'succeeded' ? 'Task completed' : 'Task failed',
+            title: data.task.status === 'succeeded' ? '任务已完成' : '任务失败',
             detail: `${typeNames[node.type]} -> ${node.title}`
           });
         }
@@ -1637,7 +1637,7 @@
         return;
       }
     }
-    addLog({ level: 'error', title: 'Task polling timed out', detail: taskId });
+    addLog({ level: 'error', title: '任务查询超时', detail: taskId });
   }
 
   async function runChain() {
@@ -1690,7 +1690,9 @@
     tasks.slice(0, 18).forEach((task) => {
       const item = document.createElement('div');
       item.className = `task-item ${escapeHtml(task.status || '')}`;
-      item.innerHTML = `<strong>${escapeHtml(task.kind)} / ${escapeHtml(task.status)}</strong><span>${escapeHtml(task.prompt || '').slice(0, 100)}</span>`;
+      const kind = task.kind === 'image' ? '生图' : task.kind === 'video' ? '视频' : task.kind === 'llm' ? 'LLM' : task.kind;
+      const statusMap = { queued: '排队中', running: '运行中', succeeded: '成功', failed: '失败' };
+      item.innerHTML = `<strong>${escapeHtml(kind)} / ${escapeHtml(statusMap[task.status] || task.status)}</strong><span>${escapeHtml(task.prompt || '').slice(0, 100)}</span>`;
       els.taskList.appendChild(item);
     });
   }
@@ -1703,14 +1705,14 @@
     const data = await api(url, { method: 'POST', body });
     const isVideo = String(file.type || '').startsWith('video/');
     addNode(isVideo ? 'video' : 'image', {
-      title: data.asset.name || file.name || (isVideo ? 'Video asset' : 'Image asset'),
+      title: data.asset.name || file.name || (isVideo ? '视频素材' : '图片素材'),
       prompt: file.name || '',
       assetUrl: data.asset.url,
       resultUrl: data.asset.url,
       resultKind: isVideo ? 'video' : 'image',
       assetName: data.asset.name || file.name || ''
     });
-    addLog({ level: 'success', title: 'File uploaded', detail: file.name || data.asset.name });
+    addLog({ level: 'success', title: '文件已上传', detail: file.name || data.asset.name });
   }
   function renderAssets() {
     const assets = state.nodes
@@ -1730,7 +1732,7 @@
         ${asset.kind === 'video'
           ? `<video src="${escapeHtml(asset.url)}" muted></video>`
           : `<img src="${escapeHtml(asset.url)}" alt="">`}
-        <span>${escapeHtml(asset.title || 'asset')}</span>
+        <span>${escapeHtml(asset.title || '素材')}</span>
       </button>
     `).join('');
     els.assetList.querySelectorAll('[data-select-node]').forEach((button) => {
@@ -1794,9 +1796,9 @@
       return acc;
     }, {});
     els.workflowSummary.innerHTML = `
-      <div class="workflow-stat"><strong>${total}</strong><span>${selectedIds.size ? 'Selected nodes' : 'Canvas nodes'}</span></div>
-      <div class="workflow-stat"><strong>${edges}</strong><span>Connections</span></div>
-      <div class="workflow-types">${Object.entries(byType).map(([type, count]) => `<span>${escapeHtml(typeNames[type] || type)} ${count}</span>`).join('') || '<span>No nodes</span>'}</div>
+      <div class="workflow-stat"><strong>${total}</strong><span>${selectedIds.size ? '选中节点' : '画布节点'}</span></div>
+      <div class="workflow-stat"><strong>${edges}</strong><span>连线</span></div>
+      <div class="workflow-types">${Object.entries(byType).map(([type, count]) => `<span>${escapeHtml(typeNames[type] || type)} ${count}</span>`).join('') || '<span>暂无节点</span>'}</div>
     `;
   }
 
@@ -1812,14 +1814,14 @@
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    addLog({ level: 'success', title: 'Workflow exported', detail: `${payload.nodes.length} nodes` });
+    addLog({ level: 'success', title: '工作流已导出', detail: `${payload.nodes.length} 个节点` });
   }
 
   async function copyWorkflowSummary() {
     const payload = workflowPayload(true);
     const summary = payload.nodes.map((node, index) => `${index + 1}. ${typeNames[node.type] || node.type} -> ${node.title}`).join('\n');
-    await copyText(summary || 'No nodes');
-    addLog({ level: 'success', title: 'Workflow summary copied', detail: `${payload.nodes.length} nodes` });
+    await copyText(summary || '暂无节点');
+    addLog({ level: 'success', title: '工作流摘要已复制', detail: `${payload.nodes.length} 个节点` });
   }
 
   async function copyText(text) {
@@ -1991,7 +1993,7 @@
       uploadFile(file).catch(showError);
     });
     els.newProjectBtn.addEventListener('click', async () => {
-      const name = window.prompt('New project name', labels.defaultProject);
+      const name = window.prompt('新项目名称', labels.defaultProject);
       if (!name) return;
       const data = await api('/api/projects', { method: 'POST', body: JSON.stringify({ name }) });
       projects.unshift(data.project);
@@ -1999,7 +2001,7 @@
     });
     els.newCanvasBtn.addEventListener('click', async () => {
       if (!currentProject) return;
-      const name = window.prompt('New canvas name', labels.canvasName);
+      const name = window.prompt('新画布名称', labels.canvasName);
       if (!name) return;
       const data = await api(`/api/projects/${currentProject.id}/canvases`, { method: 'POST', body: JSON.stringify({ name }) });
       canvases.unshift(data.canvas);
