@@ -124,6 +124,7 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn(".task-item.is-clickable", css)
 
     def test_sidebar_minimap_and_assets_are_canvas_friendly(self):
+        html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
         js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
         css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
 
@@ -141,6 +142,18 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("/api/assets", js)
         self.assertIn("function inspectTask", js)
         self.assertIn("/target", js)
+
+        self.assertIn('id="assetPage"', html)
+        self.assertIn('id="assetGrid"', html)
+        self.assertIn('id="assetPreview"', html)
+        self.assertIn('data-asset-tab="image"', html)
+        self.assertIn("function showAssetPage", js)
+        self.assertIn("function showCanvasPage", js)
+        self.assertIn("function renderAssetPage", js)
+        self.assertIn("function renderAssetSidebarSummary", js)
+        self.assertIn(".asset-page", css)
+        self.assertIn(".asset-grid", css)
+        self.assertIn(".asset-preview", css)
 
 if __name__ == "__main__":
     unittest.main()

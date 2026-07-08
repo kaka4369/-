@@ -101,6 +101,63 @@
         </div>
         <div class="zoom-chip" id="zoomChip">100%</div>
       </section>
+
+      <section id="assetPage" class="asset-page hidden" aria-label="素材库管理">
+        <div class="asset-page-head">
+          <div>
+            <strong>素材库管理</strong>
+            <span>集中管理上传素材、生成图片、生成视频和可复用参考资产。</span>
+          </div>
+          <div class="asset-page-actions">
+            <button id="assetBackBtn" class="ghost-button" type="button">返回画布</button>
+            <button id="assetPageRefreshBtn" class="ghost-button" type="button">刷新</button>
+          </div>
+        </div>
+        <div class="asset-tabs" aria-label="素材分类">
+          <button class="active" type="button" data-asset-tab="all">全部素材</button>
+          <button type="button" data-asset-tab="image">图片资产</button>
+          <button type="button" data-asset-tab="video">视频资产</button>
+          <button type="button" data-asset-tab="upload">上传素材</button>
+          <button type="button" data-asset-tab="task">生成结果</button>
+        </div>
+        <div class="asset-workspace">
+          <aside class="asset-library-tree">
+            <div class="asset-panel-title">
+              <strong>资产层级</strong>
+              <span id="assetTotalText">0 个素材</span>
+            </div>
+            <button class="asset-group active" type="button" data-asset-tab="all">
+              <span>默认资产库</span><strong id="assetAllCount">0</strong>
+            </button>
+            <button class="asset-group" type="button" data-asset-tab="image">
+              <span>图片</span><strong id="assetImageCount">0</strong>
+            </button>
+            <button class="asset-group" type="button" data-asset-tab="video">
+              <span>视频</span><strong id="assetVideoCount">0</strong>
+            </button>
+            <button class="asset-group" type="button" data-asset-tab="task">
+              <span>生成结果</span><strong id="assetTaskCount">0</strong>
+            </button>
+          </aside>
+          <section class="asset-main-panel">
+            <div class="asset-main-top">
+              <div>
+                <strong id="assetPageTitle">全部素材</strong>
+                <span id="assetPageSubtitle">查看、预览和定位画布素材。</span>
+              </div>
+              <input id="assetSearchInput" class="asset-search" type="search" placeholder="搜索素材、任务或来源" />
+            </div>
+            <div id="assetGrid" class="asset-grid"></div>
+          </section>
+          <aside class="asset-preview">
+            <div class="asset-panel-title">
+              <strong>素材预览</strong>
+              <span id="assetPreviewMeta">选择一个素材</span>
+            </div>
+            <div id="assetPreview" class="asset-preview-body"></div>
+          </aside>
+        </div>
+      </section>
     </main>
 
     <aside class="inspector">
@@ -117,7 +174,7 @@
           <span>资产库</span>
           <button id="refreshAssetBtn" class="mini-button" type="button">刷新</button>
         </div>
-        <div id="assetList" class="asset-list"></div>
+        <div id="assetList" class="asset-list asset-summary-list"></div>
       </section>
       <section class="panel" id="workflowPanel">
         <div class="panel-title">工作流</div>

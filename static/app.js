@@ -60,8 +60,22 @@
     accountModal: document.getElementById('accountModal'),
     addMenu: document.getElementById('addMenu'),
     adminLink: document.getElementById('adminLink'),
+    assetAllCount: document.getElementById('assetAllCount'),
+    assetBackBtn: document.getElementById('assetBackBtn'),
     assetBtn: document.getElementById('assetBtn'),
+    assetGrid: document.getElementById('assetGrid'),
+    assetImageCount: document.getElementById('assetImageCount'),
     assetList: document.getElementById('assetList'),
+    assetPage: document.getElementById('assetPage'),
+    assetPageRefreshBtn: document.getElementById('assetPageRefreshBtn'),
+    assetPageSubtitle: document.getElementById('assetPageSubtitle'),
+    assetPageTitle: document.getElementById('assetPageTitle'),
+    assetPreview: document.getElementById('assetPreview'),
+    assetPreviewMeta: document.getElementById('assetPreviewMeta'),
+    assetSearchInput: document.getElementById('assetSearchInput'),
+    assetTaskCount: document.getElementById('assetTaskCount'),
+    assetTotalText: document.getElementById('assetTotalText'),
+    assetVideoCount: document.getElementById('assetVideoCount'),
     backToOriginBtn: document.getElementById('backToOriginBtn'),
     canvasArea: document.getElementById('canvasArea'),
     canvasList: document.getElementById('canvasList'),
@@ -122,6 +136,9 @@
   let minimapRevealTimer = null;
   let minimapLayout = null;
   let assetCache = [];
+  let assetFilter = 'all';
+  let selectedAssetId = '';
+  let currentView = 'canvas';
   let activeEdgeCleanup = null;
   let addMenuWorldPoint = null;
   let dirty = false;
@@ -1787,6 +1804,7 @@
       addLog({ level: 'info', title: '任务没有可定位节点', detail: task.id || '' });
       return;
     }
+    if (currentView !== 'canvas') showCanvasPage();
     selectOnly(node.id);
     centerOnNode(node);
   }
@@ -1847,7 +1865,7 @@
     });
   }
 
-  function renderAssets() {
+  function currentAssetItems() {
     const nodeAssets = state.nodes
       .filter((node) => node.assetUrl || node.resultUrl)
       .map((node) => ({
@@ -1860,39 +1878,177 @@
         canvas_id: currentCanvas?.id || '',
         task_id: node.taskId || ''
       }));
-    const assets = uniqueAssets([...nodeAssets, ...assetCache]);
+    return uniqueAssets([...nodeAssets, ...assetCache]);
+  }
+
+  function assetSourceLabel(asset) {
+    if (asset.source === 'upload') return '上传素材';
+    if (asset.source === 'task') return '生成结果';
+    return '当前画布';
+  }
+
+  function filteredAssets(assets) {
+    const keyword = String(els.assetSearchInput?.value || '').trim().toLowerCase();
+    return assets.filter((asset) => {
+      const kindOk = assetFilter === 'all'
+        || (assetFilter === 'image' && asset.kind === 'image')
+        || (assetFilter === 'video' && asset.kind === 'video')
+        || (assetFilter === 'upload' && asset.source === 'upload')
+        || (assetFilter === 'task' && asset.source === 'task');
+      if (!kindOk) return false;
+      if (!keyword) return true;
+      return [asset.title, asset.kind, asset.source, asset.task_id, asset.node_id]
+        .some((value) => String(value || '').toLowerCase().includes(keyword));
+    });
+  }
+
+  function renderAssetSidebarSummary(assets) {
     if (!assets.length) {
-      els.assetList.innerHTML = `<div class="muted">${labels.noAssets}</div>`;
+      els.assetList.innerHTML = `
+        <div class="asset-sidebar-empty">${labels.noAssets}</div>
+        <button class="small-button" type="button" data-open-assets>进入素材库</button>
+      `;
+    } else {
+      const imageCount = assets.filter((asset) => asset.kind === 'image').length;
+      const videoCount = assets.filter((asset) => asset.kind === 'video').length;
+      els.assetList.innerHTML = `
+        <div class="asset-sidebar-summary">
+          <strong>${assets.length}</strong>
+          <span>素材总数</span>
+        </div>
+        <div class="asset-sidebar-stats">
+          <span>图片 ${imageCount}</span>
+          <span>视频 ${videoCount}</span>
+        </div>
+        <button class="small-button" type="button" data-open-assets>进入素材库</button>
+      `;
+    }
+    els.assetList.querySelector('[data-open-assets]')?.addEventListener('click', () => showAssetPage());
+  }
+
+  function renderAssetPreview(asset) {
+    if (!asset) {
+      els.assetPreviewMeta.textContent = '选择一个素材';
+      els.assetPreview.innerHTML = `
+        <div class="asset-preview-empty">
+          <strong>暂无可预览素材</strong>
+          <span>生成或上传素材后会在这里查看详情。</span>
+        </div>
+      `;
       return;
     }
-    els.assetList.innerHTML = assets.map((asset) => `
-      <button class="asset-item" type="button"
-        ${asset.node_id ? `data-select-node="${escapeHtml(asset.node_id)}"` : ''}
-        ${asset.task_id ? `data-asset-task-id="${escapeHtml(asset.task_id)}"` : ''}
-        ${asset.canvas_id ? `data-asset-canvas-id="${escapeHtml(asset.canvas_id)}"` : ''}>
-        ${asset.kind === 'video'
-          ? `<video src="${escapeHtml(asset.url)}" muted></video>`
-          : `<img src="${escapeHtml(asset.url)}" alt="">`}
-        <span>${escapeHtml(asset.title || '素材')}</span>
-      </button>
-    `).join('');
-    els.assetList.querySelectorAll('[data-select-node]').forEach((button) => {
+    els.assetPreviewMeta.textContent = assetSourceLabel(asset);
+    const media = asset.kind === 'video'
+      ? `<video src="${escapeHtml(asset.url)}" controls></video>`
+      : `<img src="${escapeHtml(asset.url)}" alt="">`;
+    els.assetPreview.innerHTML = `
+      <div class="asset-preview-media">${media}</div>
+      <div class="asset-preview-info">
+        <strong>${escapeHtml(asset.title || '素材')}</strong>
+        <span>${escapeHtml(asset.kind || 'file')} · ${escapeHtml(assetSourceLabel(asset))}</span>
+      </div>
+      <div class="asset-preview-actions">
+        ${asset.node_id || asset.task_id ? '<button class="small-button" type="button" data-preview-focus>定位来源</button>' : ''}
+        <a class="small-button" href="${escapeHtml(asset.url)}" target="_blank" rel="noreferrer">打开原图</a>
+      </div>
+    `;
+    els.assetPreview.querySelector('[data-preview-focus]')?.addEventListener('click', () => {
+      focusTask({
+        id: asset.task_id || '',
+        canvas_id: asset.canvas_id || '',
+        node_id: asset.node_id || ''
+      }).catch(showError);
+    });
+  }
+
+  function selectAsset(assetId) {
+    selectedAssetId = assetId || '';
+    renderAssetPage();
+  }
+
+  function renderAssetPage() {
+    const assets = currentAssetItems();
+    const visible = filteredAssets(assets);
+    const counts = {
+      all: assets.length,
+      image: assets.filter((asset) => asset.kind === 'image').length,
+      video: assets.filter((asset) => asset.kind === 'video').length,
+      task: assets.filter((asset) => asset.source === 'task').length
+    };
+    els.assetTotalText.textContent = `${counts.all} 个素材`;
+    els.assetAllCount.textContent = counts.all;
+    els.assetImageCount.textContent = counts.image;
+    els.assetVideoCount.textContent = counts.video;
+    els.assetTaskCount.textContent = counts.task;
+    const titles = { all: '全部素材', image: '图片资产', video: '视频资产', upload: '上传素材', task: '生成结果' };
+    els.assetPageTitle.textContent = titles[assetFilter] || '全部素材';
+    els.assetPageSubtitle.textContent = `当前筛选 ${visible.length} 个素材`;
+    document.querySelectorAll('[data-asset-tab]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.assetTab === assetFilter);
+    });
+    if (!selectedAssetId || !visible.some((asset) => (asset.id || asset.url) === selectedAssetId)) {
+      selectedAssetId = visible[0] ? (visible[0].id || visible[0].url) : '';
+    }
+    if (!visible.length) {
+      els.assetGrid.innerHTML = `
+        <button class="asset-upload-tile" type="button" data-upload-from-assets>
+          <strong>上传到当前分组</strong>
+          <span>也可以从生成节点输出保存到素材库。</span>
+        </button>
+        <div class="asset-empty-wide">当前筛选下暂无素材。</div>
+      `;
+      els.assetGrid.querySelector('[data-upload-from-assets]')?.addEventListener('click', () => els.fileInput.click());
+      renderAssetPreview(null);
+      return;
+    }
+    els.assetGrid.innerHTML = visible.map((asset) => {
+      const id = asset.id || asset.url;
+      const active = id === selectedAssetId;
+      return `
+        <button class="asset-card${active ? ' active' : ''}" type="button" data-asset-id="${escapeHtml(id)}">
+          <span class="asset-card-media">
+            ${asset.kind === 'video'
+              ? `<video src="${escapeHtml(asset.url)}" muted></video>`
+              : `<img src="${escapeHtml(asset.url)}" alt="">`}
+          </span>
+          <strong>${escapeHtml(asset.title || '素材')}</strong>
+          <small>${escapeHtml(assetSourceLabel(asset))}</small>
+        </button>
+      `;
+    }).join('');
+    els.assetGrid.querySelectorAll('[data-asset-id]').forEach((button) => {
       button.addEventListener('click', () => {
-        const node = nodeById(button.dataset.selectNode);
-        if (!node) return;
-        selectOnly(node.id);
-        centerOnNode(node);
+        selectAsset(button.dataset.assetId || '');
       });
     });
-    els.assetList.querySelectorAll('[data-asset-task-id]').forEach((button) => {
-      button.addEventListener('click', () => {
-        focusTask({
-          id: button.dataset.assetTaskId || '',
-          canvas_id: button.dataset.assetCanvasId || '',
-          node_id: button.dataset.selectNode || ''
-        }).catch(showError);
-      });
-    });
+    renderAssetPreview(visible.find((asset) => (asset.id || asset.url) === selectedAssetId) || visible[0]);
+  }
+
+  function renderAssets() {
+    const assets = currentAssetItems();
+    renderAssetSidebarSummary(assets);
+    renderAssetPage();
+  }
+
+  function showCanvasPage() {
+    currentView = 'canvas';
+    els.assetPage.classList.add('hidden');
+    els.canvasArea.classList.remove('hidden');
+    els.assetBtn.classList.remove('active');
+    els.canvasTitle.textContent = currentCanvas?.name || labels.canvas;
+    applyViewport();
+    renderEdges();
+    scheduleMinimapRender();
+  }
+
+  async function showAssetPage() {
+    currentView = 'assets';
+    await loadAssets();
+    els.canvasArea.classList.add('hidden');
+    els.assetPage.classList.remove('hidden');
+    els.assetBtn.classList.add('active');
+    els.canvasTitle.textContent = '素材库管理';
+    renderAssetPage();
   }
 
   function addLog(entry) {
@@ -2087,7 +2243,10 @@
 
   function bindEvents() {
     els.toolbar.querySelectorAll('[data-add]').forEach((button) => {
-      button.addEventListener('click', () => addNode(button.dataset.add));
+      button.addEventListener('click', () => {
+        if (currentView !== 'canvas') showCanvasPage();
+        addNode(button.dataset.add);
+      });
     });
     els.addMenu.querySelectorAll('[data-add-menu]').forEach((button) => {
       button.addEventListener('click', (event) => {
@@ -2100,9 +2259,18 @@
     els.runChainBtn.addEventListener('click', () => runChain().catch(showError));
     els.saveBtn.addEventListener('click', () => saveCanvas().catch(showError));
     els.workflowBtn.addEventListener('click', () => scrollPanelIntoView('workflowPanel'));
-    els.assetBtn.addEventListener('click', () => scrollPanelIntoView('assetPanel'));
+    els.assetBtn.addEventListener('click', () => showAssetPage().catch(showError));
     els.logBtn.addEventListener('click', () => scrollPanelIntoView('logPanel'));
     els.refreshAssetBtn.addEventListener('click', () => loadAssets().catch(showError));
+    els.assetPageRefreshBtn.addEventListener('click', () => loadAssets().catch(showError));
+    els.assetBackBtn.addEventListener('click', showCanvasPage);
+    els.assetSearchInput.addEventListener('input', renderAssetPage);
+    document.querySelectorAll('[data-asset-tab]').forEach((button) => {
+      button.addEventListener('click', () => {
+        assetFilter = button.dataset.assetTab || 'all';
+        renderAssetPage();
+      });
+    });
     els.clearLogBtn.addEventListener('click', () => {
       state.logs = [];
       renderLogs();
@@ -2111,6 +2279,10 @@
     els.exportWorkflowBtn.addEventListener('click', exportWorkflow);
     els.copyWorkflowBtn.addEventListener('click', () => copyWorkflowSummary().catch(showError));
     els.backToOriginBtn.addEventListener('click', () => {
+      if (currentView !== 'canvas') {
+        showCanvasPage();
+        return;
+      }
       state.viewport = { x: 120, y: 80, scale: 1 };
       applyViewport();
       setDirty();
