@@ -151,6 +151,8 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("hideAssetDrawer", js)
         self.assertIn("els.railAssetBtn?.addEventListener('click', toggleAssetPage)", js)
         self.assertIn("els.assetBtn.addEventListener('click', toggleAssetPage)", js)
+        self.assertNotIn('id="workflowBtn"', html)
+        self.assertNotIn("workflowBtn", js)
 
     def test_new_canvas_uses_in_page_modal_not_left_rail_prompt(self):
         html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")

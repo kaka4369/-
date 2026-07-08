@@ -128,7 +128,6 @@
     taskList: document.getElementById('taskList'),
     toolbar: document.querySelector('.toolbar'),
     uploadBtn: document.getElementById('uploadBtn'),
-    workflowBtn: document.getElementById('workflowBtn'),
     workflowSummary: document.getElementById('workflowSummary'),
     world: document.getElementById('world'),
     zoomChip: document.getElementById('zoomChip'),
@@ -2522,7 +2521,6 @@
     els.runBtn.addEventListener('click', () => runSelectedNode().catch(showError));
     els.runChainBtn.addEventListener('click', () => runChain().catch(showError));
     els.saveBtn.addEventListener('click', () => saveCanvas().catch(showError));
-    els.workflowBtn.addEventListener('click', () => scrollPanelIntoView('workflowPanel'));
     els.assetBtn.addEventListener('click', toggleAssetPage);
     els.railAssetBtn?.addEventListener('click', toggleAssetPage);
     els.assetDrawerCloseBtn?.addEventListener('click', hideAssetDrawer);
