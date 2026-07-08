@@ -10,6 +10,7 @@
     canvasName: '新画布',
     defaultProject: '默认项目',
     deleteConfirm: '确定删除选中的内容吗？',
+    deleteNode: '删除',
     failed: '失败',
     imagePrompt: '描述要生成的画面，可以连接提示词、角色图、场景图或参考图。',
     llmPrompt: '输入要改写、拆解或生成的内容；上游节点内容会自动带入。',
@@ -22,6 +23,7 @@
     outputPrompt: '收集上游节点结果，用于最终输出、预览或交付说明。',
     promptText: '输入提示词、脚本片段、人物设定、分镜说明或素材说明。',
     running: '运行中',
+    runNode: '运行',
     saved: '已保存',
     saving: '保存中',
     selectRunnable: '请选择可以运行的节点',
@@ -735,8 +737,8 @@
           <div class="node-title">${escapeHtml(node.title)}</div>
         </div>
         <div class="node-tools">
-          <button data-node-action="run" title="Run">▶</button>
-          <button data-node-action="delete" title="删除">×</button>
+          <button class="node-tool node-tool-run" data-node-action="run" title="${escapeHtml(labels.runNode)}">${escapeHtml(labels.runNode)}</button>
+          <button class="node-tool node-tool-delete" data-node-action="delete" title="${escapeHtml(labels.deleteNode)}">${escapeHtml(labels.deleteNode)}</button>
         </div>
       </div>
       <div class="node-body">${nodeBodyHtml(node)}</div>

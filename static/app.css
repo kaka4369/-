@@ -690,13 +690,26 @@ a { color: inherit; text-decoration: none; }
   align-items: center;
   gap: 6px;
 }
-.node-tools button {
-  width: 28px;
+.node-tools .node-tool {
+  min-width: 36px;
   height: 28px;
   border: 1px solid var(--line);
   border-radius: 7px;
   background: var(--panel);
+  padding: 0 9px;
+  color: var(--ink);
+  font-size: 12px;
   font-weight: 900;
+}
+.node-tools .node-tool-delete {
+  border-color: rgba(223, 45, 63, 0.24);
+  background: rgba(223, 45, 63, 0.08);
+  color: var(--danger);
+}
+.node-tools .node-tool-delete:hover,
+.node-tools .node-tool-delete:focus-visible {
+  border-color: rgba(223, 45, 63, 0.45);
+  background: rgba(223, 45, 63, 0.14);
 }
 .node-image .node-head {
   width: max-content;
