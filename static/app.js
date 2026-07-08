@@ -229,7 +229,7 @@
 
   function defaultSize(type) {
     if (type === 'group') return { w: 540, h: 340 };
-    if (type === 'llm') return { w: 390, h: 410 };
+    if (type === 'llm') return { w: 390, h: 340 };
     if (type === 'image') return { w: 520, h: 620 };
     if (type === 'video') return { w: 560, h: 540 };
     if (type === 'output') return { w: 380, h: 300 };
@@ -936,7 +936,6 @@
         <select data-field="llmProvider">${optionHtml(nodePresets.llmProviders, node.llmProvider)}</select>
         <select data-field="model">${optionHtml(nodePresets.llmModels, node.model)}</select>
       </div>
-      <label class="field-block compact"><span>System</span><textarea class="node-textarea system-text" spellcheck="false" data-field="systemPrompt">${escapeHtml(node.systemPrompt || '')}</textarea></label>
       <div class="input-preview-list">${upstreamPreviewHtml(node)}</div>
       <textarea class="node-textarea prompt-text" spellcheck="false" data-field="prompt" placeholder="${escapeHtml(labels.llmPrompt)}">${escapeHtml(node.prompt)}</textarea>
       ${resultHtml(node)}

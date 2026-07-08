@@ -105,6 +105,16 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn(".node-bottom-bar", css)
         self.assertIn(".console-run-button", css)
 
+    def test_llm_node_hides_system_prompt_editor(self):
+        js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
+
+        self.assertIn("if (type === 'llm') return { w: 390, h: 340 }", js)
+        self.assertIn("function llmNodeHtml", js)
+        self.assertIn("systemPrompt: '你是可靠的 AI 创作助手", js)
+        self.assertNotIn("system-text", js)
+        self.assertNotIn('data-field="systemPrompt"', js)
+        self.assertNotIn("<span>System</span>", js)
+
     def test_generation_progress_and_responsive_node_body(self):
         css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
         js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
