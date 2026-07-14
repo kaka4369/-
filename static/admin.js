@@ -12,6 +12,7 @@
 
   const usersEl = document.getElementById('adminUsers');
   const configEl = document.getElementById('adminConfig');
+  const toastEl = document.getElementById('adminToastRegion');
 
   function escapeHtml(value) {
     return String(value || '').replace(/[&<>"']/g, (char) => ({
@@ -40,6 +41,18 @@
 
   function statusText(value) {
     return value ? text.configured : text.notConfigured;
+  }
+
+  function showAdminToast(message, tone = 'error') {
+    if (!toastEl) return;
+    const toast = document.createElement('div');
+    toast.className = `toast-message ${tone}`;
+    toast.setAttribute('role', tone === 'error' ? 'alert' : 'status');
+    toast.textContent = String(message || text.failed);
+    toastEl.appendChild(toast);
+    window.setTimeout(() => {
+      toast.remove();
+    }, 4200);
   }
 
   async function loadConfig() {
@@ -85,5 +98,5 @@
     await loadUsers();
   }
 
-  boot().catch((error) => window.alert(error.message || text.failed));
+  boot().catch((error) => showAdminToast(error.message || text.failed, 'error'));
 })();

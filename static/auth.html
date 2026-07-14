@@ -4,18 +4,28 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Canvas SaaS</title>
-  <link rel="stylesheet" href="/static/app.css" />
+  <script>
+    try {
+      const savedTheme = localStorage.getItem('canvas-saas-theme') || 'light';
+      document.documentElement.dataset.theme = savedTheme === 'dark' ? 'dark' : 'light';
+      document.documentElement.style.colorScheme = savedTheme === 'dark' ? 'dark' : 'light';
+    } catch (error) {
+      document.documentElement.dataset.theme = 'light';
+    }
+  </script>
+  <link rel="stylesheet" href="/static/vendor/phosphor/phosphor.css" />
+  <link rel="stylesheet" href="/static/app.css?v=20260714-interaction-fix3" />
 </head>
 <body class="auth-body">
   <main class="auth-shell">
     <section class="auth-panel">
-      <div class="brand-mark">CS</div>
+      <div class="brand-mark"><i class="ph ph-sparkle" aria-hidden="true"></i></div>
       <p class="eyebrow">Canvas SaaS Commercial</p>
       <h1 id="authTitle">&#30331;&#24405;</h1>
       <p id="authSubtitle">&#36827;&#20837;&#20320;&#30340;&#21830;&#19994;&#30011;&#24067;&#24037;&#20316;&#21488;</p>
       <form id="authForm">
         <label id="inviteLabel" class="field-label">&#36992;&#35831;&#30721;</label>
-        <input id="inviteCode" class="field-input" autocomplete="one-time-code" placeholder="canvasv1" />
+        <input id="inviteCode" class="field-input" autocomplete="one-time-code" placeholder="输入团队邀请码" />
         <label class="field-label">&#37038;&#31665;</label>
         <input id="email" class="field-input" type="email" autocomplete="email" placeholder="you@company.com" required />
         <label class="field-label">&#23494;&#30721;</label>

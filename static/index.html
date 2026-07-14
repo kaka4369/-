@@ -4,108 +4,175 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Canvas SaaS &#21019;&#20316;&#30011;&#24067;</title>
-  <link rel="stylesheet" href="/static/app.css" />
+  <script>
+    try {
+      const savedTheme = localStorage.getItem('canvas-saas-theme') || 'light';
+      document.documentElement.dataset.theme = savedTheme === 'dark' ? 'dark' : 'light';
+      document.documentElement.style.colorScheme = savedTheme === 'dark' ? 'dark' : 'light';
+    } catch (error) {
+      document.documentElement.dataset.theme = 'light';
+    }
+  </script>
+  <link rel="stylesheet" href="/static/vendor/phosphor/phosphor.css" />
+  <link rel="stylesheet" href="/static/app.css?v=20260714-interaction-fix3" />
 </head>
 <body>
   <div class="app-shell">
-    <nav class="quick-rail" aria-label="&#24555;&#25463;&#24037;&#20855;">
-      <button id="railAssetBtn" class="rail-button" type="button" title="&#32032;&#26448;&#24211;">&#24211;</button>
-    </nav>
-
-    <aside class="sidebar">
-      <div class="brand-row">
-        <div class="brand-mark">CS</div>
-        <div>
+    <aside class="app-sidebar" aria-label="工作台导航">
+      <button id="backToOriginBtn" class="brand-chip sidebar-brand" type="button" title="&#22238;&#21040;&#30011;&#24067;">
+        <span class="brand-mark"><i class="ph ph-sparkle" aria-hidden="true"></i></span>
+        <span>
           <strong>Canvas SaaS</strong>
-          <span>Commercial Clean Room</span>
+          <small>Spatial Workbench</small>
+        </span>
+      </button>
+      <nav class="sidebar-nav" aria-label="工作区与页面">
+        <div class="workspace-cluster sidebar-workspaces">
+          <div class="workspace-menu">
+            <button class="workspace-trigger" type="button">
+              <i class="ph ph-folder-simple" aria-hidden="true"></i>
+              <span>&#39033;&#30446;</span>
+              <strong id="projectCurrentName">&#40664;&#35748;&#39033;&#30446;</strong>
+            </button>
+            <button id="newProjectBtn" class="icon-button" type="button" title="&#26032;&#39033;&#30446;">
+              <i class="ph ph-plus" aria-hidden="true"></i>
+            </button>
+            <div id="projectList" class="nav-list"></div>
+          </div>
+          <div class="workspace-menu">
+            <button class="workspace-trigger" type="button">
+              <i class="ph ph-notepad" aria-hidden="true"></i>
+              <span>&#30011;&#24067;</span>
+              <strong id="canvasCurrentName">&#26032;&#30011;&#24067;</strong>
+            </button>
+            <button id="newCanvasBtn" class="icon-button" type="button" title="&#26032;&#30011;&#24067;">
+              <i class="ph ph-plus" aria-hidden="true"></i>
+            </button>
+            <div id="canvasList" class="nav-list"></div>
+          </div>
         </div>
-      </div>
-
-      <section class="side-section">
-        <div class="section-head">
-          <span>&#39033;&#30446;</span>
-          <button id="newProjectBtn" class="icon-button" title="&#26032;&#39033;&#30446;">+</button>
+        <div class="sidebar-actions">
+          <button id="assetBtn" type="button" aria-label="资产库" title="资产库"><i class="ph ph-images" aria-hidden="true"></i><span>&#36164;&#20135;&#24211;</span></button>
+          <button id="logBtn" type="button" aria-label="运行日志" title="运行日志"><i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i><span>&#26085;&#24535;</span></button>
+          <button id="themeToggleBtn" class="theme-toggle" type="button" aria-pressed="false" aria-label="切换到黑夜模式"><i class="ph ph-moon" aria-hidden="true"></i><span>黑夜</span></button>
+          <button class="account-button top-account" id="accountBtn" type="button" aria-label="用户中心" title="用户中心">
+            <i class="ph ph-user-circle" aria-hidden="true"></i>
+            <span id="accountEmail">&#36134;&#21495;</span>
+          </button>
         </div>
-        <div id="projectList" class="nav-list"></div>
-      </section>
-
-      <section class="side-section grow">
-        <div class="section-head">
-          <span>&#30011;&#24067;</span>
-          <button id="newCanvasBtn" class="icon-button" title="&#26032;&#30011;&#24067;">+</button>
-        </div>
-        <div id="canvasList" class="nav-list"></div>
-      </section>
-
-      <section class="side-section account-card">
-        <button class="account-button" id="accountBtn">
-          <span id="accountEmail">&#36134;&#21495;</span>
-          <strong id="creditText">0 &#28857;</strong>
-        </button>
-      </section>
+      </nav>
     </aside>
 
-    <aside id="assetDrawer" class="asset-drawer hidden" aria-label="&#32032;&#26448;&#24211;">
-      <div class="asset-drawer-head">
-        <div>
-          <strong>&#32032;&#26448;&#24211;</strong>
-          <span id="assetDrawerCount">0 &#20010;&#32032;&#26448;</span>
+    <main class="app-main main">
+      <aside id="assetDrawer" class="asset-drawer hidden" aria-label="&#32032;&#26448;&#24211;">
+        <div class="asset-drawer-head">
+          <div>
+            <strong>&#32032;&#26448;&#24211;</strong>
+            <span id="assetDrawerCount">0 &#20010;&#32032;&#26448;</span>
+          </div>
+          <div class="asset-drawer-actions">
+            <button id="assetDrawerUploadBtn" class="mini-button" type="button" title="&#19978;&#20256;">
+              <i class="ph ph-upload-simple" aria-hidden="true"></i>
+            </button>
+            <button id="assetDrawerCloseBtn" class="mini-button" type="button" title="&#20851;&#38381;">
+              <i class="ph ph-x" aria-hidden="true"></i>
+            </button>
+          </div>
         </div>
-        <div class="asset-drawer-actions">
-          <button id="assetDrawerUploadBtn" class="mini-button" type="button" title="&#19978;&#20256;">+</button>
-          <button id="assetDrawerCloseBtn" class="mini-button" type="button" title="&#20851;&#38381;">x</button>
+        <input id="assetDrawerSearch" class="asset-drawer-search" type="search" placeholder="&#25628;&#32034;&#32032;&#26448;" />
+        <div class="asset-drawer-tabs" aria-label="&#32032;&#26448;&#31579;&#36873;">
+          <button class="active" type="button" data-asset-tab="all">&#20840;&#37096;</button>
+          <button type="button" data-asset-tab="image">&#22270;&#29255;</button>
+          <button type="button" data-asset-tab="video">&#35270;&#39057;</button>
+          <button type="button" data-asset-tab="task">&#29983;&#25104;</button>
         </div>
-      </div>
-      <input id="assetDrawerSearch" class="asset-drawer-search" type="search" placeholder="&#25628;&#32034;&#32032;&#26448;" />
-      <div class="asset-drawer-tabs" aria-label="&#32032;&#26448;&#31579;&#36873;">
-        <button class="active" type="button" data-asset-tab="all">&#20840;&#37096;</button>
-        <button type="button" data-asset-tab="image">&#22270;&#29255;</button>
-        <button type="button" data-asset-tab="video">&#35270;&#39057;</button>
-        <button type="button" data-asset-tab="task">&#29983;&#25104;</button>
-      </div>
-      <div id="assetDrawerGrid" class="asset-drawer-grid"></div>
-    </aside>
+        <div id="assetDrawerGrid" class="asset-drawer-grid"></div>
+      </aside>
 
-    <main class="main">
-      <header class="topbar">
-        <button id="backToOriginBtn" class="round-button" title="&#22238;&#21040;&#30011;&#24067;">&#9679;</button>
-        <div class="title-block">
-          <strong id="canvasTitle">&#26410;&#36873;&#25321;&#30011;&#24067;</strong>
-          <span id="saveState">&#26410;&#20445;&#23384;</span>
+      <header class="topbar compact-topbar">
+        <div class="topbar-context">
+          <i class="ph ph-squares-four" aria-hidden="true"></i>
+          <div class="title-block">
+            <span>当前画布</span>
+            <strong id="canvasTitle">&#26410;&#36873;&#25321;&#30011;&#24067;</strong>
+          </div>
+          <small id="saveState">&#26410;&#20445;&#23384;</small>
         </div>
-        <nav class="toolbar" aria-label="canvas tools">
-          <button data-add="prompt">&#25552;&#31034;&#35789;</button>
-          <button data-add="loop">&#24490;&#29615;</button>
-          <button data-add="llm">LLM</button>
-          <button data-add="image">API&#29983;&#25104;</button>
-          <button data-add="video">&#35270;&#39057;&#29983;&#25104;</button>
-          <button data-add="output">输出</button>
-          <button id="uploadBtn">&#19978;&#20256;</button>
-          <button id="groupBtn">&#20998;&#32452;</button>
-          <button id="runBtn" class="strong">&#36816;&#34892;&#33410;&#28857;</button>
-          <button id="runChainBtn">&#19968;&#38190;&#36816;&#34892;</button>
-          <button id="saveBtn">&#20445;&#23384;</button>
-          <button id="assetBtn">&#36164;&#20135;&#24211;</button>
-          <button id="logBtn">&#26085;&#24535;</button>
-        </nav>
+        <div class="toolbar-shell">
+          <nav class="toolbar" aria-label="canvas tools">
+            <button data-add="prompt">&#25552;&#31034;&#35789;</button>
+            <button data-add="loop">&#24490;&#29615;</button>
+            <button data-add="llm">LLM</button>
+            <button data-add="image">API&#29983;&#25104;</button>
+            <button data-add="video">&#35270;&#39057;&#29983;&#25104;</button>
+            <button data-add="output">输出</button>
+            <button id="directorRecipeBtn" type="button">导演台</button>
+            <button id="uploadBtn">&#19978;&#20256;</button>
+            <button id="groupBtn">&#20998;&#32452;</button>
+          </nav>
+        </div>
+        <div class="top-actions">
+          <div class="credit-chip"><i class="ph ph-coins" aria-hidden="true"></i><strong id="creditText">0 &#28857;</strong></div>
+          <button id="runBtn" class="strong" type="button">&#36816;&#34892;&#33410;&#28857;</button>
+          <button id="runChainBtn" type="button"><i class="ph ph-play" aria-hidden="true"></i><span>&#36816;&#34892;</span></button>
+          <button id="saveBtn" type="button">&#20445;&#23384;</button>
+        </div>
       </header>
 
       <section id="canvasArea" class="canvas-area" tabindex="0">
-        <div id="world" class="world">
-          <svg id="edgeLayer" class="edge-layer" width="200000" height="200000" viewBox="0 0 200000 200000"></svg>
-          <div id="nodeLayer" class="node-layer"></div>
+        <div id="viewportPan" class="viewport-pan">
+          <div id="worldScale" class="world-scale">
+            <div id="world" class="world">
+              <svg id="edgeLayer" class="edge-layer" width="200000" height="200000" viewBox="0 0 200000 200000"></svg>
+              <div id="nodeLayer" class="node-layer"></div>
+            </div>
+          </div>
         </div>
         <div id="selectionBox" class="selection-box hidden"></div>
         <div id="emptyHint" class="empty-hint">
           <strong>&#24320;&#22987;&#21019;&#20316;</strong>
           <span>&#28155;&#21152;&#33410;&#28857;&#65292;&#25302;&#21160;&#31471;&#21475;&#36830;&#32447;&#65292;&#25110;&#19978;&#20256;&#32032;&#26448;&#24314;&#31435;&#27969;&#31243;</span>
         </div>
+        <div class="canvas-create-dock" aria-label="快捷创作">
+          <button type="button" data-dock-add="prompt">
+            <i class="ph ph-text-t dock-icon" aria-hidden="true"></i>
+            <strong>提示</strong>
+            <small>脚本</small>
+          </button>
+          <button type="button" data-dock-add="llm">
+            <i class="ph ph-brain dock-icon" aria-hidden="true"></i>
+            <strong>LLM</strong>
+            <small>改写</small>
+          </button>
+          <button type="button" data-dock-add="image">
+            <i class="ph ph-image dock-icon" aria-hidden="true"></i>
+            <strong>生图</strong>
+            <small>资产</small>
+          </button>
+          <button type="button" data-dock-add="video">
+            <i class="ph ph-video-camera dock-icon" aria-hidden="true"></i>
+            <strong>视频</strong>
+            <small>镜头</small>
+          </button>
+          <button type="button" data-dock-action="upload">
+            <i class="ph ph-upload-simple dock-icon" aria-hidden="true"></i>
+            <strong>上传</strong>
+            <small>素材</small>
+          </button>
+          <button type="button" data-dock-action="assets">
+            <i class="ph ph-images dock-icon" aria-hidden="true"></i>
+            <strong>资产</strong>
+            <small>管理</small>
+          </button>
+        </div>
+        <p id="capabilitySetupHint" class="sr-only">标有状态点的功能仍可添加和编辑节点，但运行前需要配置服务。</p>
         <div id="addMenu" class="add-menu hidden" role="menu" aria-label="添加节点">
           <button type="button" data-add-menu="prompt">提示词</button>
           <button type="button" data-add-menu="loop">循环</button>
           <button type="button" data-add-menu="llm">LLM</button>
           <button type="button" data-add-menu="image">API生成</button>
           <button type="button" data-add-menu="video">视频生成</button>
+          <button type="button" data-add-menu="director">导演台</button>
           <button type="button" data-add-menu="output">输出</button>
         </div>
         <div class="canvas-minimap" id="minimap" aria-label="缩放预览">
@@ -173,18 +240,92 @@
             </div>
             <div id="assetGrid" class="asset-grid"></div>
           </section>
-          <aside class="asset-preview">
+          <aside class="asset-preview" aria-labelledby="assetPreviewHeading">
             <div class="asset-panel-title">
-              <strong>素材预览</strong>
+              <strong id="assetPreviewHeading">素材预览</strong>
               <span id="assetPreviewMeta">选择一个素材</span>
             </div>
             <div id="assetPreview" class="asset-preview-body"></div>
           </aside>
         </div>
       </section>
-    </main>
 
-    <aside class="inspector">
+      <section id="accountPage" class="subpage account-page hidden" aria-label="用户中心">
+        <div class="subpage-head">
+          <div>
+            <strong>用户中心</strong>
+            <span>查看当前登录账号、点数余额和管理入口。</span>
+          </div>
+          <div class="subpage-actions">
+            <button id="accountBackBtn" class="ghost-button" type="button">返回画布</button>
+          </div>
+        </div>
+        <div class="account-page-grid">
+          <section class="subpage-card">
+            <span class="subpage-kicker">账号</span>
+            <strong id="accountPageEmail">-</strong>
+            <p>当前网页登录账号，用于隔离项目、画布、资产和任务记录。</p>
+          </section>
+          <section class="subpage-card">
+            <span class="subpage-kicker">点数余额</span>
+            <strong><span id="accountPageCredits">0</span> 点</strong>
+            <p>生成图片、视频和 LLM 任务会扣除点数，后台可手动充值。</p>
+          </section>
+          <section class="subpage-card storage-summary-card">
+            <span class="subpage-kicker">存储空间</span>
+            <strong><span id="accountStorageUsed">0 B</span> / <span id="accountStorageLimit">0 B</span></strong>
+            <div class="storage-meter" aria-label="存储空间使用率"><span id="accountStorageBar"></span></div>
+            <p>上传素材和生成结果按账号独立存放，删除素材后会释放空间。</p>
+          </section>
+          <section class="subpage-card">
+            <span class="subpage-kicker">身份</span>
+            <strong id="accountPageRole">用户</strong>
+            <p>管理员账号可以进入后台，为用户调整点数。</p>
+          </section>
+          <section class="subpage-card password-card">
+            <span class="subpage-kicker">登录安全</span>
+            <strong>修改密码</strong>
+            <form id="passwordChangeForm" class="password-form">
+              <label class="modal-field">
+                <span>当前密码</span>
+                <input id="currentPasswordInput" type="password" autocomplete="current-password" required />
+              </label>
+              <label class="modal-field">
+                <span>新密码</span>
+                <input id="newPasswordInput" type="password" minlength="6" autocomplete="new-password" required />
+              </label>
+              <label class="modal-field">
+                <span>确认新密码</span>
+                <input id="confirmPasswordInput" type="password" minlength="6" autocomplete="new-password" required />
+              </label>
+              <button class="primary-button" type="submit">更新密码</button>
+            </form>
+          </section>
+          <section class="subpage-card account-actions-card">
+            <span class="subpage-kicker">操作</span>
+            <div class="subpage-action-row">
+              <a id="accountPageAdminLink" class="ghost-button hidden" href="/admin">后台管理</a>
+              <button id="accountPageLogoutBtn" class="danger-button" type="button">退出登录</button>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section id="logsPage" class="subpage logs-page hidden" aria-label="运行日志">
+        <div class="subpage-head">
+          <div>
+            <strong>运行日志</strong>
+            <span>集中查看当前画布的节点运行、保存、上传和错误记录。</span>
+          </div>
+          <div class="subpage-actions">
+            <button id="logsBackBtn" class="ghost-button" type="button">返回画布</button>
+            <button id="logsPageClearBtn" class="ghost-button" type="button">清空日志</button>
+          </div>
+        </div>
+        <div id="logsPageList" class="logs-page-list"></div>
+      </section>
+
+      <aside class="inspector legacy-inspector" hidden aria-hidden="true">
       <section class="panel" id="inspectPanel">
         <div class="panel-title">选中</div>
         <div id="nodeInspector" class="muted">&#36873;&#25321;&#33410;&#28857;&#25110;&#20998;&#32452;</div>
@@ -204,9 +345,11 @@
         <div class="panel-title">工作流</div>
         <div id="workflowSummary" class="workflow-summary"></div>
         <div class="panel-actions">
+          <button id="saveWorkflowTemplateBtn" class="small-button" type="button">保存模板</button>
           <button id="exportWorkflowBtn" class="small-button" type="button">导出选中 JSON</button>
           <button id="copyWorkflowBtn" class="small-button" type="button">复制摘要</button>
         </div>
+        <div id="workflowTemplateList" class="workflow-template-list"></div>
       </section>
       <section class="panel" id="logPanel">
         <div class="panel-title">
@@ -224,12 +367,13 @@
           <span>Shift + 点击：多选</span>
         </div>
       </section>
-    </aside>
+      </aside>
+    </main>
   </div>
 
   <div id="accountModal" class="modal hidden">
     <div class="modal-card">
-      <button id="closeAccount" class="icon-close" aria-label="close">x</button>
+      <button id="closeAccount" class="icon-close" type="button" aria-label="close"><i class="ph ph-x" aria-hidden="true"></i></button>
       <h2>&#29992;&#25143;&#20013;&#24515;</h2>
       <p id="accountLine" class="muted"></p>
       <div class="metric-row">
@@ -245,14 +389,14 @@
 
   <div id="mediaPreviewModal" class="modal media-preview-modal hidden" role="dialog" aria-modal="true" aria-label="完整图片">
     <div class="media-preview-card">
-      <button class="icon-close" type="button" data-preview-close aria-label="关闭">x</button>
+      <button class="icon-close" type="button" data-preview-close aria-label="关闭"><i class="ph ph-x" aria-hidden="true"></i></button>
       <img id="mediaPreviewImage" alt="完整图片" />
     </div>
   </div>
 
   <div id="canvasCreateModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="canvasCreateTitle">
     <form id="canvasCreateForm" class="modal-card canvas-create-card">
-      <button id="canvasCreateCloseBtn" class="icon-close" type="button" aria-label="关闭">x</button>
+      <button id="canvasCreateCloseBtn" class="icon-close" type="button" aria-label="关闭"><i class="ph ph-x" aria-hidden="true"></i></button>
       <span class="modal-kicker">新建画布</span>
       <h2 id="canvasCreateTitle">创建新画布</h2>
       <label class="modal-field">
@@ -266,7 +410,9 @@
     </form>
   </div>
 
+  <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="false"></div>
+
   <input id="fileInput" type="file" accept="image/*,video/*" hidden />
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=20260714-interaction-fix3"></script>
 </body>
 </html>
