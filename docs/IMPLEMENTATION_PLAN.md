@@ -1,4 +1,4 @@
-# Canvas SaaS Commercial V1 Implementation Plan
+# 云芝画布 V1 Implementation Plan
 
 > **For agentic workers:** implement task-by-task, with tests before production code.
 

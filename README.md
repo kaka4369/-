@@ -1,4 +1,4 @@
-# Canvas SaaS Commercial V1
+# 云芝画布（Canvas SaaS Commercial V1）
 
 Clean-room commercial canvas prototype.
 
@@ -7,7 +7,7 @@ Clean-room commercial canvas prototype.
 - Invite-code registration
 - Email login
 - User center with credit balance
-- First registered user becomes admin by default
+- First registered user can become admin in local development only
 - Admin manual credit recharge
 - Per-user projects, canvases, uploads, tasks, and storage folders
 - Persistent canvas state in SQLite
@@ -31,13 +31,13 @@ Open:
 http://127.0.0.1:3020/register
 ```
 
-Default invite code in `.env.example` is:
+Development invite code in `.env.example` is:
 
 ```text
 canvasv1
 ```
 
-The first registered user is admin when `AUTO_ADMIN_FIRST_USER=1`.
+This default is for local testing only. The first registered user is admin when `AUTO_ADMIN_FIRST_USER=1`. Keep this local-only convenience off in production.
 
 ## Docker run
 
@@ -66,19 +66,38 @@ IMAGE_GENERATION_URL=
 IMAGE_MODEL=
 
 VIDEO_API_KEY=
-VIDEO_GENERATION_URL=
-VIDEO_MODEL=
+VIDEO_GENERATION_URL=https://llm.guohe-sh.com/api/doubao/v3/contents/generations/tasks
+VIDEO_MODEL=doubao-seedance-2-0-260128
+VIDEO_STATUS_URL_TEMPLATE=https://llm.guohe-sh.com/api/doubao/v3/contents/generations/tasks/{task_id}
 ```
 
-The V1 task adapters use simple OpenAI-style JSON calls. Provider-specific routes can be added later in `call_llm`, `call_image`, and `call_video`.
+The V1 task adapters use OpenAI-style JSON calls with normalized node options. Seedance strong-reference jobs use the provider's multi-reference contract: both images are sent as `reference_image` and are addressed as `@图片1` and `@图片2`; first/last-frame media must not be mixed with reference media. The selected model is stored with each task, while the server resolves its centrally configured provider at runtime without exposing provider choices to members. Successful image and video media is copied into `storage/users/<user_id>/outputs` before the task is marked complete.
 
 ## Production checklist
 
-- Set a strong `SESSION_SECRET`.
+- Set `APP_ENV=production` or `CANVAS_PRODUCTION=1`.
+- Set a strong `SESSION_SECRET` with at least 32 characters.
 - Set `COOKIE_SECURE=1` behind HTTPS.
-- Use a private `INVITE_CODE`.
+- Set `AUTO_ADMIN_FIRST_USER=0` and initialize the admin account deliberately.
+- Use a private `INVITE_CODE` instead of the development default.
+- Keep `.env`, `data/`, `storage/`, generated images, and logs out of the Docker image.
+- Keep `AUTH_RATE_LIMIT_MAX` and `AUTH_RATE_LIMIT_WINDOW_SECONDS` enabled.
+- Keep `TASK_WORKER_ENABLED=1`; tune lease and heartbeat values only when upstream generation regularly exceeds two minutes.
+- Set `MAX_OUTPUT_MB` high enough for the largest expected video while retaining an upload/download safety limit.
 - Move secrets into platform secret storage.
 - Put the app behind HTTPS reverse proxy.
 - Back up `data/` and `storage/`.
 - Replace SQLite with PostgreSQL before scaling beyond internal beta.
 - Add payment provider webhooks before public self-serve recharge.
+
+Initialize the production admin account with:
+
+```powershell
+python main.py create-admin owner@example.com <strong-password>
+```
+
+Build a clean deployable bundle with:
+
+```powershell
+python scripts\build_release_bundle.py --output output\release\canvas-saas-commercial --zip
+```

@@ -3,24 +3,252 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Canvas SaaS &#21518;&#21488;</title>
-  <link rel="stylesheet" href="/static/app.css" />
+  <title>云芝画布 · 管理后台</title>
+  <script>
+    try {
+      const savedTheme = localStorage.getItem('canvas-saas-theme') || 'light';
+      document.documentElement.dataset.theme = savedTheme === 'dark' ? 'dark' : 'light';
+      document.documentElement.style.colorScheme = savedTheme === 'dark' ? 'dark' : 'light';
+    } catch (error) {
+      document.documentElement.dataset.theme = 'light';
+    }
+  </script>
+  <link rel="stylesheet" href="/static/vendor/phosphor/phosphor.css?v=20260721-editor-discard2" />
+  <link rel="stylesheet" href="/static/app.css?v=20260721-editor-discard2" />
 </head>
-<body>
+<body class="admin-body">
   <main class="admin-shell">
     <header class="admin-head">
-      <div>
-        <h1>&#21518;&#21488;&#31649;&#29702;</h1>
-        <p>&#25163;&#21160;&#35843;&#25972;&#29992;&#25143;&#28857;&#25968;&#65292;&#31532;&#19968;&#29256;&#29992;&#20110;&#20869;&#27979;&#20805;&#20540;&#12290;</p>
+      <div class="admin-brand">
+        <span class="admin-brand-mark brand-avatar-shell" aria-hidden="true"><img class="brand-avatar" src="/static/brand/yunzhi-avatar.png" alt="" /></span>
+        <div>
+          <span class="admin-eyebrow">云芝画布 · 管理后台</span>
+          <h1 id="adminPageTitle">用户用量</h1>
+          <p id="adminPageDescription">查看每位用户的点数余额、任务消耗与模型使用情况。</p>
+        </div>
       </div>
-      <a class="ghost-button" href="/">&#36820;&#22238;&#30011;&#24067;</a>
+      <div class="admin-head-actions">
+        <button id="adminThemeToggle" class="admin-icon-button" type="button" aria-label="切换到黑夜模式" aria-pressed="false">
+          <i class="ph ph-moon" aria-hidden="true"></i>
+          <span>黑夜</span>
+        </button>
+        <button id="adminLogout" class="admin-icon-button" type="button">
+          <i class="ph ph-sign-out" aria-hidden="true"></i>
+          <span>退出</span>
+        </button>
+        <a id="publicAppLink" class="ghost-button" href="/">
+          <i class="ph ph-arrow-up-right" aria-hidden="true"></i>
+          返回创作台
+        </a>
+      </div>
     </header>
-    <section class="panel">
-      <div class="panel-title">&#29992;&#25143;&#21015;&#34920;</div>
-      <div id="adminConfig" class="config-strip"></div>
-      <div id="adminUsers" class="admin-users"></div>
+
+    <nav class="admin-section-tabs" aria-label="后台功能">
+      <button class="active" type="button" data-admin-view="usage" aria-controls="adminUsageView" aria-selected="true">
+        <i class="ph ph-chart-donut" aria-hidden="true"></i>
+        用户用量
+      </button>
+      <button type="button" data-admin-view="providers" aria-controls="adminProviderView" aria-selected="false">
+        <i class="ph ph-gauge" aria-hidden="true"></i>
+        API 配置
+      </button>
+    </nav>
+
+    <div id="adminUsageView" class="admin-view">
+    <section class="admin-summary" aria-label="平台用量概览">
+      <article class="admin-metric-card">
+        <span class="admin-metric-icon blue" aria-hidden="true"><i class="ph ph-users-three"></i></span>
+        <div><span>用户总数</span><strong id="summaryUsers">—</strong></div>
+      </article>
+      <article class="admin-metric-card">
+        <span class="admin-metric-icon violet" aria-hidden="true"><i class="ph ph-chart-line-up"></i></span>
+        <div><span>累计实际消耗</span><strong id="summaryConsumed">—</strong><small>点</small></div>
+      </article>
+      <article class="admin-metric-card">
+        <span class="admin-metric-icon orange" aria-hidden="true"><i class="ph ph-hourglass-medium"></i></span>
+        <div><span>进行中占用</span><strong id="summaryPending">—</strong><small>点</small></div>
+      </article>
+      <article class="admin-metric-card">
+        <span class="admin-metric-icon green" aria-hidden="true"><i class="ph ph-coins"></i></span>
+        <div><span>当前总余额</span><strong id="summaryBalance">—</strong><small>点</small></div>
+      </article>
+    </section>
+
+    <section class="admin-panel" aria-labelledby="usageTitle">
+      <div class="admin-panel-head">
+        <div>
+          <h2 id="usageTitle">用户明细</h2>
+          <p>实际消耗仅统计成功任务；失败退款与进行中占用分开显示。</p>
+        </div>
+        <div class="admin-filters">
+          <label class="admin-search">
+            <i class="ph ph-magnifying-glass" aria-hidden="true"></i>
+            <span class="sr-only">搜索用户邮箱</span>
+            <input id="adminUserSearch" type="search" autocomplete="off" placeholder="搜索用户邮箱" />
+          </label>
+          <label class="admin-sort">
+            <span class="sr-only">用户排序方式</span>
+            <select id="adminUserSort">
+              <option value="consumed">按消耗排序</option>
+              <option value="recent">按最近使用排序</option>
+              <option value="balance">按余额排序</option>
+              <option value="created">按注册时间排序</option>
+            </select>
+            <i class="ph ph-caret-down" aria-hidden="true"></i>
+          </label>
+        </div>
+      </div>
+
+      <div id="adminConfig" class="config-strip" aria-label="模型配置状态"></div>
+
+      <div class="admin-table" role="table" aria-label="用户消耗明细">
+        <div class="admin-table-head" role="row">
+          <span role="columnheader">用户</span>
+          <span role="columnheader">余额</span>
+          <span role="columnheader">实际消耗</span>
+          <span role="columnheader">任务</span>
+          <span role="columnheader">模型消耗</span>
+          <span role="columnheader">最后使用</span>
+          <span role="columnheader">点数调整</span>
+        </div>
+        <div id="adminUsers" class="admin-users" role="rowgroup"></div>
+        <div id="adminEmpty" class="admin-empty hidden">
+          <i class="ph ph-user-list" aria-hidden="true"></i>
+          <strong>没有匹配的用户</strong>
+          <span>请尝试更换搜索关键词。</span>
+        </div>
+      </div>
+    </section>
+
+    <p class="admin-footnote">
+      <i class="ph ph-info" aria-hidden="true"></i>
+      此处展示平台点数与任务次数，不等同于供应商账单金额。
+    </p>
+    </div>
+
+    <section id="adminProviderView" class="admin-panel admin-provider-panel" aria-labelledby="providerSettingsTitle" hidden>
+      <div class="admin-panel-head admin-provider-head">
+        <div>
+          <h2 id="providerSettingsTitle">API 配置</h2>
+          <p>管理文本、生图与视频节点使用的服务地址、模型和密钥。</p>
+        </div>
+        <span class="admin-security-note">
+          <i class="ph ph-sparkle" aria-hidden="true"></i>
+          密钥加密保存且不会回显
+        </span>
+      </div>
+
+      <div class="admin-provider-content">
+        <div class="admin-provider-kind-tabs" role="tablist" aria-label="模型类型">
+          <button class="active" type="button" role="tab" data-provider-kind="llm" aria-selected="true">
+            <i class="ph ph-brain" aria-hidden="true"></i>
+            文本模型
+          </button>
+          <button type="button" role="tab" data-provider-kind="image" aria-selected="false">
+            <i class="ph ph-image" aria-hidden="true"></i>
+            生图模型
+          </button>
+          <button type="button" role="tab" data-provider-kind="video" aria-selected="false">
+            <i class="ph ph-video-camera" aria-hidden="true"></i>
+            视频模型
+          </button>
+        </div>
+
+        <div class="admin-provider-workspace">
+          <aside class="admin-provider-sidebar" aria-label="供应商">
+            <div class="admin-provider-sidebar-head">
+              <span>供应商</span>
+              <small>选择要编辑的配置</small>
+            </div>
+            <div id="adminProviderList" class="admin-provider-list"></div>
+          </aside>
+
+          <form id="adminProviderForm" class="admin-provider-form" autocomplete="off">
+            <div class="admin-provider-form-head">
+              <div>
+                <span id="adminProviderKindLabel" class="admin-eyebrow">文本模型</span>
+                <h3 id="adminProviderName">—</h3>
+              </div>
+              <span id="adminProviderState" class="admin-provider-state missing">未配置</span>
+            </div>
+
+            <div class="admin-provider-field admin-provider-key-field">
+              <label for="adminProviderKey">API Key</label>
+              <div class="admin-secret-control">
+                <input id="adminProviderKey" type="password" autocomplete="new-password" spellcheck="false" placeholder="输入 API Key" />
+                <button id="adminProviderKeyToggle" type="button" aria-label="显示本次输入的密钥" aria-pressed="false">
+                  <span class="admin-secret-eye" aria-hidden="true"></span>
+                </button>
+              </div>
+              <div class="admin-field-meta">
+                <small id="adminProviderKeyHint">尚未保存密钥</small>
+                <button id="adminProviderKeyClear" class="admin-danger-link" type="button" disabled>清除已保存密钥</button>
+              </div>
+            </div>
+
+            <div id="adminProviderBaseUrlField" class="admin-provider-field">
+              <label for="adminProviderBaseUrl">API Base URL</label>
+              <input id="adminProviderBaseUrl" type="url" inputmode="url" spellcheck="false" placeholder="https://api.example.com/v1" />
+              <small>未填写完整请求地址时，将自动追加 /chat/completions。</small>
+            </div>
+
+            <div class="admin-provider-field">
+              <label id="adminProviderUrlLabel" for="adminProviderUrl">完整请求地址（可选）</label>
+              <input id="adminProviderUrl" type="url" inputmode="url" spellcheck="false" placeholder="https://api.example.com/v1/chat/completions" />
+              <small id="adminProviderUrlHint">适用于 Azure 等需要完整部署路径的接口。</small>
+            </div>
+
+            <div class="admin-provider-field">
+              <label for="adminProviderModel">可用模型</label>
+              <div class="admin-model-control">
+                <input id="adminProviderModel" type="text" spellcheck="false" maxlength="120" aria-describedby="adminProviderModelsStatus" placeholder="手动添加模型 ID" />
+                <button id="adminProviderModelAdd" class="admin-model-add" type="button">
+                  <i class="ph ph-plus" aria-hidden="true"></i>
+                  <span>添加</span>
+                </button>
+                <button id="adminProviderModelsFetch" type="button" aria-controls="adminProviderModelPicker" aria-busy="false">
+                  <i class="ph ph-download-simple" aria-hidden="true"></i>
+                  <span>拉取文本模型</span>
+                </button>
+              </div>
+              <div id="adminProviderModelPicker" class="admin-model-picker" role="group" aria-labelledby="adminProviderModelSummary" hidden>
+                <div class="admin-model-picker-head">
+                  <strong id="adminProviderModelSummary">已选择 0 个模型</strong>
+                  <div class="admin-model-picker-actions">
+                    <button id="adminProviderModelSelectAll" type="button" aria-controls="adminProviderModelList">全选</button>
+                    <button id="adminProviderModelClear" type="button" aria-controls="adminProviderModelList">清空</button>
+                  </div>
+                </div>
+                <div id="adminProviderModelList" class="admin-model-list" role="group" aria-label="可选模型"></div>
+                <label class="admin-default-model" for="adminProviderModelDefault">
+                  <span>默认模型</span>
+                  <select id="adminProviderModelDefault" aria-describedby="adminProviderModelsStatus" disabled></select>
+                </label>
+              </div>
+              <small id="adminProviderModelsStatus" class="admin-model-status" role="status" aria-live="polite">可手动添加，或从已保存的请求地址拉取文本模型。</small>
+            </div>
+
+            <div id="adminProviderStatusUrlField" class="admin-provider-field" hidden>
+              <label for="adminProviderStatusUrl">状态查询地址模板（可选）</label>
+              <input id="adminProviderStatusUrl" type="url" inputmode="url" spellcheck="false" placeholder="https://api.example.com/tasks/{task_id}" />
+              <small>异步视频接口请保留 <code>{task_id}</code> 占位符。</small>
+            </div>
+
+            <div class="admin-provider-form-foot">
+              <span id="adminProviderSource" class="admin-provider-source">
+                <i class="ph ph-info" aria-hidden="true"></i>
+                当前读取服务器环境配置
+              </span>
+              <button id="adminProviderSave" class="primary-button" type="submit">
+                <span id="adminProviderSaveLabel">保存配置（0 个模型）</span>
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </section>
   </main>
-  <script src="/static/admin.js"></script>
+  <div id="adminToastRegion" class="toast-region" aria-live="polite" aria-atomic="false"></div>
+  <script src="/static/admin.js?v=20260721-editor-discard2"></script>
 </body>
 </html>

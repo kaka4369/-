@@ -1,4 +1,4 @@
-# Canvas SaaS Commercial V1 Spec
+# 云芝画布 V1 Spec
 
 ## Goal
 

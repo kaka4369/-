@@ -3,19 +3,42 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Canvas SaaS</title>
-  <link rel="stylesheet" href="/static/app.css" />
+  <title>云芝画布 · 登录</title>
+  <script>
+    try {
+      const savedTheme = localStorage.getItem('canvas-saas-theme') || 'light';
+      document.documentElement.dataset.theme = savedTheme === 'dark' ? 'dark' : 'light';
+      document.documentElement.style.colorScheme = savedTheme === 'dark' ? 'dark' : 'light';
+    } catch (error) {
+      document.documentElement.dataset.theme = 'light';
+    }
+  </script>
+  <link rel="stylesheet" href="/static/vendor/phosphor/phosphor.css?v=20260721-editor-discard2" />
+  <link rel="stylesheet" href="/static/app.css?v=20260721-editor-discard2" />
 </head>
 <body class="auth-body">
   <main class="auth-shell">
+    <section class="auth-brand-stage" aria-label="云芝画布品牌形象">
+      <div class="auth-brand-copy">
+        <span>YUNZHI CANVAS</span>
+        <h2>让灵感，在画布上生长。</h2>
+        <p>从一个想法，到图片与视频，让云芝陪你把创意变成看得见的作品。</p>
+      </div>
+      <div class="auth-brand-visual">
+        <img src="/static/brand/yunzhi-ip.png" alt="云芝画布 IP 形象三视图" />
+      </div>
+      <div class="auth-brand-signature"><span>云芝</span><small>你的 AI 创作搭档</small></div>
+    </section>
     <section class="auth-panel">
-      <div class="brand-mark">CS</div>
-      <p class="eyebrow">Canvas SaaS Commercial</p>
+      <div class="auth-panel-brand">
+        <div class="brand-mark brand-avatar-shell" aria-hidden="true"><img class="brand-avatar" src="/static/brand/yunzhi-avatar.png" alt="" /></div>
+        <div><p class="eyebrow">云芝画布</p><span>AI 视觉创作工作台</span></div>
+      </div>
       <h1 id="authTitle">&#30331;&#24405;</h1>
-      <p id="authSubtitle">&#36827;&#20837;&#20320;&#30340;&#21830;&#19994;&#30011;&#24067;&#24037;&#20316;&#21488;</p>
+      <p id="authSubtitle">进入云芝画布创作工作台</p>
       <form id="authForm">
         <label id="inviteLabel" class="field-label">&#36992;&#35831;&#30721;</label>
-        <input id="inviteCode" class="field-input" autocomplete="one-time-code" placeholder="canvasv1" />
+        <input id="inviteCode" class="field-input" autocomplete="one-time-code" placeholder="输入团队邀请码" />
         <label class="field-label">&#37038;&#31665;</label>
         <input id="email" class="field-input" type="email" autocomplete="email" placeholder="you@company.com" required />
         <label class="field-label">&#23494;&#30721;</label>
@@ -30,13 +53,16 @@
     const text = {
       loginTitle: '\u767b\u5f55',
       registerTitle: '\u6ce8\u518c\u8d26\u53f7',
-      loginSubtitle: '\u8fdb\u5165\u4f60\u7684\u5546\u4e1a\u753b\u5e03\u5de5\u4f5c\u53f0',
-      registerSubtitle: '\u4f7f\u7528\u9080\u8bf7\u7801\u521b\u5efa\u56e2\u961f\u8d26\u53f7',
+      loginSubtitle: '进入云芝画布创作工作台',
+      registerSubtitle: '使用邀请码创建云芝画布团队账号',
       loginLink: '\u6ca1\u6709\u8d26\u53f7\uff0c\u53bb\u6ce8\u518c',
       registerLink: '\u5df2\u6709\u8d26\u53f7\uff0c\u53bb\u767b\u5f55',
+      adminTitle: '\u7ba1\u7406\u5458\u767b\u5f55',
+      adminSubtitle: '进入云芝画布用户用量与点数管理后台',
       failed: '\u64cd\u4f5c\u5931\u8d25'
     };
-    const isRegister = location.pathname.includes('register');
+    const isAdminPortal = location.hostname.startsWith('admin.');
+    const isRegister = !isAdminPortal && location.pathname.includes('register');
     const title = document.getElementById('authTitle');
     const subtitle = document.getElementById('authSubtitle');
     const invite = document.getElementById('inviteCode');
@@ -44,11 +70,12 @@
     const link = document.getElementById('switchAuth');
     const form = document.getElementById('authForm');
     const error = document.getElementById('authError');
-    title.textContent = isRegister ? text.registerTitle : text.loginTitle;
-    subtitle.textContent = isRegister ? text.registerSubtitle : text.loginSubtitle;
+    title.textContent = isAdminPortal ? text.adminTitle : (isRegister ? text.registerTitle : text.loginTitle);
+    subtitle.textContent = isAdminPortal ? text.adminSubtitle : (isRegister ? text.registerSubtitle : text.loginSubtitle);
     invite.hidden = !isRegister;
     inviteLabel.hidden = !isRegister;
     invite.required = isRegister;
+    link.hidden = isAdminPortal;
     link.href = isRegister ? '/login' : '/register';
     link.textContent = isRegister ? text.registerLink : text.loginLink;
     form.addEventListener('submit', async (event) => {
@@ -69,7 +96,7 @@
         error.textContent = data.detail || text.failed;
         return;
       }
-      location.href = '/';
+      location.href = isAdminPortal ? '/admin' : '/';
     });
   </script>
 </body>
