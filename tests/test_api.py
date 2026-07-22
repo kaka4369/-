@@ -59,6 +59,24 @@ class CommercialApiTest(unittest.TestCase):
         self.assertEqual(ready.status_code, 200)
         self.assertEqual(ready.json(), {"status": "ok"})
 
+    def test_versioned_static_assets_are_immutable(self):
+        with EnvPatch(TASK_WORKER_ENABLED="0"):
+            with TestClient(commercial_main.app) as client:
+                versioned = client.get(
+                    "/static/app.css?v=20260723-performance1",
+                )
+                unversioned = client.get(
+                    "/static/app.css",
+                )
+
+        self.assertEqual(versioned.status_code, 200)
+        self.assertEqual(
+            versioned.headers.get("cache-control"),
+            commercial_main.VERSIONED_STATIC_CACHE_CONTROL,
+        )
+        self.assertEqual(versioned.text, unversioned.text)
+        self.assertNotIn("immutable", unversioned.headers.get("cache-control", ""))
+
     def test_readyz_failure_is_generic_and_does_not_leak_details(self):
         with EnvPatch(TASK_WORKER_ENABLED="0"):
             with TestClient(commercial_main.app) as client:

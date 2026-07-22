@@ -21,7 +21,7 @@ from urllib.parse import quote, unquote, urljoin, urlparse
 
 import httpx
 from cryptography.fernet import Fernet, InvalidToken
-from fastapi import FastAPI, File, HTTPException, Request, Response, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image, ImageOps, UnidentifiedImageError
@@ -50,6 +50,7 @@ DATA_DIR = Path(os.getenv("DATA_DIR") or (ROOT / "data"))
 STORAGE_DIR = Path(os.getenv("STORAGE_DIR") or (ROOT / "storage"))
 DB_PATH = DATA_DIR / "app.db"
 STATIC_DIR = ROOT / "static"
+VERSIONED_STATIC_CACHE_CONTROL = "public, max-age=31536000, immutable"
 DEMO_MEDIA_FILES = {
     "image": STATIC_DIR / "demo" / "yunzhi-generated-character.png",
     "video": STATIC_DIR / "demo" / "yunzhi-seedance-story.mp4",
@@ -109,6 +110,89 @@ PROVIDER_PREFIXES = {
 DEFAULT_PROVIDERS = {"llm": "国禾API", "image": "国禾API", "video": "灵境API"}
 PROVIDER_SETTING_PREFIX = "provider_config"
 MAX_PROVIDER_MODELS = 100
+ECOMMERCE_MODEL_MANIFEST = STATIC_DIR / "ecommerce" / "models" / "manifest.json"
+ECOMMERCE_MODEL_ROOT = ECOMMERCE_MODEL_MANIFEST.parent
+ECOMMERCE_SCENE_PRESETS = (
+    {
+        "id": "mediterranean-terrace",
+        "name": "地中海露台",
+        "prompt": "明亮的地中海白色石墙露台，蓝天与柔和海景，干净的自然日光",
+        "preview_image": "/static/ecommerce/scenes/outdoor-scenes-contact-sheet.png",
+        "preview_index": 0,
+    },
+    {
+        "id": "sunset-garden",
+        "name": "落日花园",
+        "prompt": "高级住宅花园的落日金色时刻，绿植层次丰富，柔和逆光与自然阴影",
+        "preview_image": "/static/ecommerce/scenes/outdoor-scenes-contact-sheet.png",
+        "preview_index": 1,
+    },
+    {
+        "id": "villa-courtyard",
+        "name": "别墅庭院",
+        "prompt": "现代别墅庭院，浅色石材、克制绿植与高级自然光，背景整洁",
+        "preview_image": "/static/ecommerce/scenes/outdoor-scenes-contact-sheet.png",
+        "preview_index": 2,
+    },
+    {
+        "id": "paris-rooftop",
+        "name": "巴黎屋顶",
+        "prompt": "巴黎城市屋顶露台，远景建筑虚化，阴天柔光，时装大片氛围",
+        "preview_image": "/static/ecommerce/scenes/outdoor-scenes-contact-sheet.png",
+        "preview_index": 3,
+    },
+    {
+        "id": "seaside-estate",
+        "name": "海边庄园",
+        "prompt": "临海庄园步道，海面与远景轻微虚化，通透日光，优雅度假氛围",
+        "preview_image": "/static/ecommerce/scenes/outdoor-scenes-contact-sheet.png",
+        "preview_index": 4,
+    },
+    {
+        "id": "city-terrace",
+        "name": "都市露台",
+        "prompt": "现代都市高层露台，玻璃与浅色建筑线条，柔和天光，高级商业摄影",
+        "preview_image": "/static/ecommerce/scenes/outdoor-scenes-contact-sheet.png",
+        "preview_index": 5,
+    },
+)
+ECOMMERCE_SHOTS = {
+    "full": "正面全身照，从头到脚完整入镜，服装轮廓和下摆清晰可见",
+    "half": "正面半身照，突出领口、肩部、袖型、门襟和面料细节",
+    "detail": "服装细节近景，准确呈现面料纹理、工艺、印花和装饰位置",
+    "back": "背面全身照，模特自然背对镜头，完整展示服装后背结构和下摆",
+}
+ECOMMERCE_RATIO_PRESETS = {
+    "3:4": "竖版电商主图，适合完整展示模特与服装",
+    "1:1": "方形电商主图，适合商品列表与平台封面",
+    "4:5": "竖版详情图，适合移动端商品详情与社交媒体",
+    "2:3": "标准全身人像比例，保留更多头脚空间",
+    "9:16": "移动端全屏竖图，适合短视频平台封面",
+    "4:3": "横版详情图，适合并排展示人物与环境",
+    "3:2": "横版商业摄影比例，适合场景化棚拍",
+    "16:9": "宽幅横版场景图，适合店铺横幅与展示页",
+}
+ECOMMERCE_POSE_NAMES = {
+    "front": "正面站姿",
+    "three-quarter": "四分之三侧转",
+    "side": "侧面站姿",
+    "back": "背面站姿",
+    "weight-shift": "重心侧移",
+    "walking": "自然行走",
+    "arms-open": "展袖站姿",
+    "turn-look": "转身回望",
+}
+ECOMMERCE_POSES = {
+    "front": "自然正面站姿，肩线端正，双臂不过度遮挡服装",
+    "three-quarter": "身体朝镜头自然转约 45 度，脸部看向镜头，双臂放松，清楚展示服装正面与侧面廓形",
+    "side": "自然侧身站姿，清楚展示服装侧面廓形与腰线",
+    "back": "自然背面站姿，完整展示后背结构、肩线和下摆",
+    "weight-shift": "重心自然落在一侧，一条腿略微前伸，双臂自然下垂，形成轻松稳定的站姿",
+    "walking": "自然向前行走的动态抓拍，步态轻松，服装垂坠与运动感真实",
+    "arms-open": "双臂与身体略微分开，双手自然放松，不遮挡袖型、腰线和侧缝",
+    "turn-look": "身体背向镜头约四分之三，头部自然回望镜头，同时展示服装后背与侧面轮廓",
+}
+ECOMMERCE_WHITE_BACKGROUND_CONTRACT = "neutral-white-srgb-v1"
 
 
 class AppError(Exception):
@@ -116,6 +200,14 @@ class AppError(Exception):
         super().__init__(message)
         self.message = message
         self.status_code = status_code
+
+
+class EcommerceWhiteBackgroundQualityError(RuntimeError):
+    def __init__(self, metrics: Dict[str, Any]):
+        self.metrics = metrics
+        super().__init__(
+            "白底质量检查未通过：背景不是均匀的中性纯白，系统已阻止交付暖白或偏黄结果"
+        )
 
 
 def now_ms() -> int:
@@ -1155,6 +1247,20 @@ def init_db() -> None:
                 FOREIGN KEY(user_id) REFERENCES users(id)
             );
 
+            CREATE TABLE IF NOT EXISTS generation_batches (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                client_request_id TEXT NOT NULL,
+                canvas_id TEXT NOT NULL DEFAULT '',
+                model TEXT NOT NULL DEFAULT '',
+                total_items INTEGER NOT NULL,
+                total_cost INTEGER NOT NULL,
+                created_at INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL,
+                FOREIGN KEY(user_id) REFERENCES users(id),
+                UNIQUE(user_id, client_request_id)
+            );
+
             CREATE TABLE IF NOT EXISTS app_settings (
                 key TEXT PRIMARY KEY,
                 value_json TEXT NOT NULL,
@@ -1199,7 +1305,13 @@ def init_db() -> None:
                 "attempt_count": "INTEGER NOT NULL DEFAULT 0",
                 "lease_until": "INTEGER NOT NULL DEFAULT 0",
                 "worker_id": "TEXT NOT NULL DEFAULT ''",
+                "batch_id": "TEXT NOT NULL DEFAULT ''",
+                "batch_item_key": "TEXT NOT NULL DEFAULT ''",
             },
+        )
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_batch_item "
+            "ON tasks(batch_id, batch_item_key) WHERE batch_id <> '' AND batch_item_key <> ''"
         )
     recover_interrupted_tasks()
 
@@ -1871,6 +1983,37 @@ def normalize_task_options(kind: str, options: Optional[Dict[str, Any]] = None) 
                 "count": option_int(source.get("count"), 1, 1, 4),
             }
         )
+        if option_text(source.get("operation"), 20) == "edit":
+            raw_references = source.get("reference_inputs") if isinstance(source.get("reference_inputs"), dict) else {}
+            product_asset_id = clean_id(raw_references.get("product_asset_id"))
+            model_preset_id = clean_id(raw_references.get("model_preset_id"))
+            if product_asset_id:
+                normalized["operation"] = "edit"
+                normalized["count"] = 1
+                normalized["reference_inputs"] = {
+                    "product_asset_id": product_asset_id,
+                    "model_preset_id": model_preset_id,
+                }
+        raw_ecommerce = source.get("ecommerce") if isinstance(source.get("ecommerce"), dict) else {}
+        if raw_ecommerce:
+            environment = option_text(raw_ecommerce.get("environment"), 20)
+            shot = option_text(raw_ecommerce.get("shot"), 20)
+            pose = option_text(raw_ecommerce.get("pose"), 20)
+            normalized["ecommerce"] = {
+                "environment": environment if environment in {"white", "outdoor"} else "white",
+                "shot": shot if shot in ECOMMERCE_SHOTS else "full",
+                "pose": pose if pose in ECOMMERCE_POSES else "",
+                "scene_preset_id": clean_id(raw_ecommerce.get("scene_preset_id")),
+                "model_preset_id": clean_id(raw_ecommerce.get("model_preset_id")),
+                "background_contract": (
+                    ECOMMERCE_WHITE_BACKGROUND_CONTRACT
+                    if environment == "white"
+                    and option_text(raw_ecommerce.get("background_contract"), 50)
+                    == ECOMMERCE_WHITE_BACKGROUND_CONTRACT
+                    else ""
+                ),
+                "item_index": option_int(raw_ecommerce.get("item_index"), 0, 0, 19),
+            }
     elif kind == "video":
         mode = option_text(source.get("mode")) or "text_to_video"
         aspect_ratio = option_text(source.get("aspect_ratio")) or "16:9"
@@ -1918,6 +2061,414 @@ def task_from_row(row: Any) -> Optional[Dict[str, Any]]:
         item.pop(source_key, None)
     item["refunded"] = bool(item.get("refunded"))
     return item
+
+
+def load_ecommerce_catalog() -> Dict[str, Any]:
+    try:
+        payload = json.loads(ECOMMERCE_MODEL_MANIFEST.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise AppError("电商模特资源暂不可用", 503) from exc
+    raw_models = payload.get("models") if isinstance(payload, dict) else None
+    if not isinstance(raw_models, list) or len(raw_models) != 20:
+        raise AppError("电商模特资源不完整", 503)
+
+    root = ECOMMERCE_MODEL_ROOT.resolve()
+    models: list[Dict[str, Any]] = []
+    seen: set[str] = set()
+    for raw in raw_models:
+        if not isinstance(raw, dict):
+            raise AppError("电商模特资源格式不正确", 503)
+        preset_id = clean_id(raw.get("id"))
+        group = option_text(raw.get("group"), 30)
+        gender = option_text(raw.get("gender"), 20)
+        image_url = str(raw.get("image") or "").strip()
+        if (
+            not preset_id
+            or preset_id in seen
+            or group not in {"domestic", "international"}
+            or gender not in {"female", "male"}
+        ):
+            raise AppError("电商模特资源格式不正确", 503)
+        parsed_path = unquote(urlparse(image_url).path)
+        if not parsed_path.startswith("/static/ecommerce/models/"):
+            raise AppError("电商模特资源路径不安全", 503)
+        target = (ROOT / parsed_path.lstrip("/")).resolve()
+        if not target.is_relative_to(root) or not target.is_file() or target.suffix.lower() not in {".png", ".jpg", ".jpeg"}:
+            raise AppError("电商模特资源文件缺失", 503)
+        models.append(
+            {
+                "id": preset_id,
+                "group": group,
+                "gender": gender,
+                "display_name": option_text(raw.get("display_name"), 80) or preset_id,
+                "tags": [option_text(tag, 30) for tag in raw.get("tags", []) if option_text(tag, 30)][:8],
+                "image": image_url,
+                "_path": str(target),
+            }
+        )
+        seen.add(preset_id)
+    distribution = {
+        (group, gender): sum(
+            model["group"] == group and model["gender"] == gender
+            for model in models
+        )
+        for group in ("domestic", "international")
+        for gender in ("female", "male")
+    }
+    if any(count != 5 for count in distribution.values()):
+        raise AppError("电商模特资源性别分布不完整", 503)
+    return {
+        "models": models,
+        "scenes": [dict(scene) for scene in ECOMMERCE_SCENE_PRESETS],
+        "shots": [{"id": key, "name": value} for key, value in ECOMMERCE_SHOTS.items()],
+        "ratios": [
+            {"id": key, "name": key, "description": value}
+            for key, value in ECOMMERCE_RATIO_PRESETS.items()
+        ],
+        "poses": [
+            {"id": "auto", "name": "自动", "description": "根据商品版型自动选择不遮挡服装的自然姿势"}
+        ]
+        + [
+            {"id": key, "name": ECOMMERCE_POSE_NAMES[key], "description": value}
+            for key, value in ECOMMERCE_POSES.items()
+        ],
+        "image_cost": task_cost("image"),
+        "max_batch_items": 20,
+    }
+
+
+def public_ecommerce_catalog() -> Dict[str, Any]:
+    catalog = load_ecommerce_catalog()
+    return {
+        **catalog,
+        "models": [
+            {
+                **{key: value for key, value in model.items() if key not in {"_path", "image"}},
+                "image_url": model["image"],
+            }
+            for model in catalog["models"]
+        ],
+    }
+
+
+def ecommerce_prompt(item: Dict[str, Any], catalog: Dict[str, Any]) -> str:
+    model_preset_id = clean_id(item.get("model_preset_id"))
+    custom_model_prompt = option_text(item.get("custom_model_prompt"), 800)
+    environment = option_text(item.get("environment"), 20)
+    scene_preset_id = clean_id(item.get("scene_preset_id"))
+    custom_scene_prompt = option_text(item.get("custom_scene_prompt"), 800)
+    shot = option_text(item.get("shot"), 20)
+    pose = option_text(item.get("pose"), 20)
+
+    if model_preset_id:
+        model_instruction = "严格保持第二张参考图中成年模特的脸部、发型、体型、肤色与身份一致"
+    else:
+        model_instruction = f"创建并固定一位成年服装模特，性别与人物特征严格遵循人物设定：{custom_model_prompt}"
+    if environment == "white":
+        environment_instruction = (
+            "纯白无缝电商影棚背景；背景必须是完全均匀的中性纯白（sRGB #FFFFFF，"
+            "R=255、G=255、B=255），四角与主体周围亮度一致。采用约 5500K 的中性色温均匀柔光；"
+            "禁止暖白、米白、奶油色、灰白、淡黄或其他色偏，禁止渐变、纹理、环境色、"
+            "彩色反射、彩色投影与黄光污染；仅允许模特脚下非常轻微、低饱和的中性灰接触阴影"
+        )
+    else:
+        scenes = {scene["id"]: scene for scene in catalog["scenes"]}
+        scene_text = custom_scene_prompt or str((scenes.get(scene_preset_id) or {}).get("prompt") or "")
+        environment_instruction = f"户外商业时装拍摄场景：{scene_text}。人物与服装是画面主体，背景自然虚化但可辨识"
+    shot_instruction = ECOMMERCE_SHOTS.get(shot, ECOMMERCE_SHOTS["full"])
+    pose_instruction = (
+        f"姿势要求：{ECOMMERCE_POSES[pose]}"
+        if pose in ECOMMERCE_POSES
+        else "姿势自然、克制，手臂不遮挡服装关键结构"
+    )
+
+    return (
+        "生成一张写实、高级、可直接用于电商详情页的服装模特摄影图。\n"
+        "参考图规则：第一张图片是唯一商品款式依据；"
+        + ("第二张图片是唯一模特身份依据。\n" if model_preset_id else "不提供模特参考图。\n")
+        + "商品锁定：完整保留第一张商品图的颜色、面料质感、廓形、领口、袖型、门襟、纽扣、口袋、腰线、下摆、印花、刺绣、珠饰和透明度；不得新增、删除、移动、替换或重新设计任何商品细节。\n"
+        + f"模特锁定：{model_instruction}；同一批次中保持身份稳定。\n"
+        + f"拍摄环境：{environment_instruction}。\n"
+        + f"镜头构图：{shot_instruction}。{pose_instruction}。\n"
+        + "画质要求：真实皮肤与织物纹理，准确比例，专业电商摄影，主体清晰，无水印、无文字、无边框。\n"
+        + "负向约束：不要改变服装款式或颜色，不要额外配饰，不要畸形肢体、重复人物、错误手指、遮挡商品、拼贴画、商品平铺图或假人台。"
+        + (
+            "白底附加禁令：不得使用暖黄、米黄、奶油色、灰白或渐变背景，不得产生有色投影、彩色反光或背景色带。"
+            if environment == "white"
+            else ""
+        )
+    )[:20000]
+
+
+def _validate_ecommerce_product_asset(conn: sqlite3.Connection, user_id: str, asset_id: str) -> sqlite3.Row:
+    row = conn.execute(
+        "SELECT id, kind, path FROM assets WHERE user_id = ? AND id = ?",
+        (clean_id(user_id), clean_id(asset_id)),
+    ).fetchone()
+    if not row:
+        raise AppError("商品图片不存在或无权使用", 404)
+    if row["kind"] != "image":
+        raise AppError("商品素材必须是图片")
+    root = Path(user_storage_path(user_id)).resolve()
+    target = Path(str(row["path"] or "")).resolve()
+    if not target.is_relative_to(root) or not target.is_file():
+        raise AppError("商品图片文件不存在", 404)
+    return row
+
+
+def _normalize_ecommerce_item(item: Dict[str, Any], catalog: Dict[str, Any]) -> Dict[str, Any]:
+    product_asset_id = clean_id(item.get("product_asset_id"))
+    model_preset_id = clean_id(item.get("model_preset_id"))
+    custom_model_prompt = option_text(item.get("custom_model_prompt"), 800)
+    environment = option_text(item.get("environment"), 20)
+    scene_preset_id = clean_id(item.get("scene_preset_id"))
+    custom_scene_prompt = option_text(item.get("custom_scene_prompt"), 800)
+    shot = option_text(item.get("shot"), 20) or "full"
+    pose = option_text(item.get("pose"), 20)
+    if pose == "auto":
+        pose = ""
+    ratio = option_text(item.get("ratio"), 20) or "3:4"
+    image_size = option_text(item.get("image_size"), 20) or "2K"
+    if not product_asset_id:
+        raise AppError("请选择商品图片")
+    model_ids = {model["id"] for model in catalog["models"]}
+    if bool(model_preset_id) == bool(custom_model_prompt):
+        raise AppError("请选择一个内置模特，或填写自定义模特提示词")
+    if model_preset_id and model_preset_id not in model_ids:
+        raise AppError("所选模特不存在", 404)
+    if environment not in {"white", "outdoor"}:
+        raise AppError("拍摄环境不正确")
+    if environment == "outdoor":
+        scene_ids = {scene["id"] for scene in catalog["scenes"]}
+        if bool(scene_preset_id) == bool(custom_scene_prompt):
+            raise AppError("室外拍摄请选择一个场景，或填写自定义场景提示词")
+        if scene_preset_id and scene_preset_id not in scene_ids:
+            raise AppError("所选场景不存在", 404)
+    else:
+        scene_preset_id = ""
+        custom_scene_prompt = ""
+    if shot not in ECOMMERCE_SHOTS:
+        raise AppError("拍摄镜头不正确")
+    if pose and pose not in ECOMMERCE_POSES:
+        raise AppError("模特姿势不正确")
+    if ratio not in ECOMMERCE_RATIO_PRESETS:
+        raise AppError("图片比例不正确")
+    if image_size not in {"自适应", "auto", "1K", "2K", "4K"}:
+        raise AppError("图片尺寸不正确")
+    return {
+        "product_asset_id": product_asset_id,
+        "model_preset_id": model_preset_id,
+        "custom_model_prompt": custom_model_prompt,
+        "environment": environment,
+        "scene_preset_id": scene_preset_id,
+        "custom_scene_prompt": custom_scene_prompt,
+        "shot": shot,
+        "pose": pose,
+        "ratio": ratio,
+        "image_size": image_size,
+    }
+
+
+def create_ecommerce_batch(
+    user_id: str,
+    client_request_id: str,
+    items: list[Dict[str, Any]],
+    canvas_id: str = "",
+    model: str = "",
+) -> tuple[Dict[str, Any], bool]:
+    clean_user = clean_id(user_id)
+    request_key = str(client_request_id or "").strip()
+    if not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", request_key):
+        raise AppError("client_request_id 格式不正确")
+    if not isinstance(items, list) or not 1 <= len(items) <= 20:
+        raise AppError("每批必须包含 1 到 20 个款式")
+    catalog = load_ecommerce_catalog()
+    normalized_items = [_normalize_ecommerce_item(item, catalog) for item in items]
+    selected_model = option_text(model, 120)
+    batch_id = uuid.uuid4().hex
+    cost_each = task_cost("image")
+    total_cost = cost_each * len(normalized_items)
+    ts = now_ms()
+    created = False
+
+    with db() as conn:
+        conn.execute("BEGIN IMMEDIATE")
+        existing = conn.execute(
+            "SELECT id FROM generation_batches WHERE user_id = ? AND client_request_id = ?",
+            (clean_user, request_key),
+        ).fetchone()
+        if existing:
+            batch_id = existing["id"]
+        else:
+            _project_id, target_canvas_id = resolve_active_workspace_target(
+                conn,
+                clean_user,
+                canvas_id=canvas_id,
+            )
+            for item in normalized_items:
+                _validate_ecommerce_product_asset(conn, clean_user, item["product_asset_id"])
+            if total_cost:
+                adjust_credits_in_transaction(
+                    conn,
+                    clean_user,
+                    -total_cost,
+                    f"电商拍摄批次扣费（{len(normalized_items)} 张）",
+                )
+            conn.execute(
+                "INSERT INTO generation_batches "
+                "(id, user_id, client_request_id, canvas_id, model, total_items, total_cost, created_at, updated_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (batch_id, clean_user, request_key, target_canvas_id, selected_model, len(normalized_items), total_cost, ts, ts),
+            )
+            for index, item in enumerate(normalized_items):
+                task_id = uuid.uuid4().hex
+                item_key = f"item-{index + 1:03d}"
+                options = normalize_task_options(
+                    "image",
+                    {
+                        "operation": "edit",
+                        "model": selected_model,
+                        "ratio": item["ratio"],
+                        "image_size": item["image_size"],
+                        "count": 1,
+                        "reference_inputs": {
+                            "product_asset_id": item["product_asset_id"],
+                            "model_preset_id": item["model_preset_id"],
+                        },
+                        "ecommerce": {
+                            "environment": item["environment"],
+                            "shot": item["shot"],
+                            "pose": item["pose"],
+                            "scene_preset_id": item["scene_preset_id"],
+                            "model_preset_id": item["model_preset_id"],
+                            "background_contract": (
+                                ECOMMERCE_WHITE_BACKGROUND_CONTRACT
+                                if item["environment"] == "white"
+                                else ""
+                            ),
+                            "item_index": index,
+                        },
+                    },
+                )
+                conn.execute(
+                    "INSERT INTO tasks "
+                    "(id, user_id, kind, prompt, cost, status, canvas_id, node_id, options_json, request_id, "
+                    "batch_id, batch_item_key, created_at, updated_at) "
+                    "VALUES (?, ?, 'image', ?, ?, 'queued', ?, '', ?, ?, ?, ?, ?, ?)",
+                    (
+                        task_id,
+                        clean_user,
+                        ecommerce_prompt(item, catalog),
+                        cost_each,
+                        target_canvas_id,
+                        json.dumps(options, ensure_ascii=False),
+                        uuid.uuid4().hex,
+                        batch_id,
+                        item_key,
+                        ts + index,
+                        ts + index,
+                    ),
+                )
+            created = True
+    batch = get_ecommerce_batch(clean_user, batch_id)
+    if not batch:
+        raise AppError("电商拍摄批次创建失败", 500)
+    return batch, created
+
+
+def get_ecommerce_batch(user_id: str, batch_id: str) -> Optional[Dict[str, Any]]:
+    clean_user = clean_id(user_id)
+    clean_batch = clean_id(batch_id)
+    with db() as conn:
+        batch = conn.execute(
+            "SELECT * FROM generation_batches WHERE user_id = ? AND id = ?",
+            (clean_user, clean_batch),
+        ).fetchone()
+        if not batch:
+            return None
+        rows = conn.execute(
+            "SELECT * FROM tasks WHERE user_id = ? AND batch_id = ? ORDER BY batch_item_key",
+            (clean_user, clean_batch),
+        ).fetchall()
+    tasks = [task for row in rows if (task := task_from_row(row))]
+    counts = {status: sum(task.get("status") == status for task in tasks) for status in ("queued", "running", "succeeded", "failed")}
+    if tasks and counts["succeeded"] == len(tasks):
+        status = "succeeded"
+    elif tasks and counts["failed"] == len(tasks):
+        status = "failed"
+    elif counts["queued"] or counts["running"]:
+        status = "running" if counts["running"] or counts["succeeded"] or counts["failed"] else "queued"
+    else:
+        status = "partial"
+    safe_tasks = []
+    for task in tasks:
+        task_options = task.get("options") or {}
+        reference_inputs = task_options.get("reference_inputs") or {}
+        safe_tasks.append(
+            {
+                "id": task["id"],
+                "batch_item_key": task.get("batch_item_key", ""),
+                "status": task["status"],
+                "cost": task["cost"],
+                "error": task.get("error", ""),
+                "result": task.get("result") or {},
+                "product_asset_id": clean_id(reference_inputs.get("product_asset_id")),
+                "ecommerce": task_options.get("ecommerce") or {},
+                "created_at": task["created_at"],
+                "updated_at": task["updated_at"],
+            }
+        )
+    return {
+        "id": batch["id"],
+        "client_request_id": batch["client_request_id"],
+        "canvas_id": batch["canvas_id"],
+        "model": batch["model"],
+        "total_items": batch["total_items"],
+        "total_cost": batch["total_cost"],
+        "status": status,
+        "counts": counts,
+        "tasks": safe_tasks,
+        "created_at": batch["created_at"],
+        "updated_at": batch["updated_at"],
+    }
+
+
+def list_ecommerce_batches(
+    user_id: str,
+    canvas_id: str = "",
+    active_only: bool = False,
+    limit: int = 10,
+) -> list[Dict[str, Any]]:
+    clean_user = clean_id(user_id)
+    clean_canvas = clean_id(canvas_id)
+    safe_limit = max(1, min(int(limit), 20))
+    clauses = ["batch.user_id = ?"]
+    params: list[Any] = [clean_user]
+    if clean_canvas:
+        clauses.append("batch.canvas_id = ?")
+        params.append(clean_canvas)
+    if active_only:
+        clauses.append(
+            "EXISTS ("
+            "SELECT 1 FROM tasks task "
+            "WHERE task.user_id = batch.user_id AND task.batch_id = batch.id "
+            "AND task.status IN ('queued', 'running')"
+            ")"
+        )
+    params.append(safe_limit)
+    with db() as conn:
+        rows = conn.execute(
+            "SELECT batch.id FROM generation_batches batch "
+            f"WHERE {' AND '.join(clauses)} "
+            "ORDER BY batch.created_at DESC, batch.id DESC LIMIT ?",
+            tuple(params),
+        ).fetchall()
+    batches = []
+    for row in rows:
+        batch = get_ecommerce_batch(clean_user, row["id"])
+        if batch and (not active_only or batch["status"] in {"queued", "running"}):
+            batches.append(batch)
+    return batches
 
 
 def create_task(
@@ -2293,6 +2844,121 @@ def sanitized_upstream_result(value: Any) -> Any:
     return value
 
 
+def ecommerce_task_requires_neutral_white(task: Dict[str, Any]) -> bool:
+    if task.get("kind") != "image":
+        return False
+    options = normalize_task_options("image", task.get("options") or {})
+    ecommerce = options.get("ecommerce") if isinstance(options.get("ecommerce"), dict) else {}
+    return (
+        ecommerce.get("environment") == "white"
+        and ecommerce.get("background_contract") == ECOMMERCE_WHITE_BACKGROUND_CONTRACT
+    )
+
+
+def inspect_ecommerce_white_background(path: Path) -> Dict[str, Any]:
+    """Gate delivery using only the outer background; never recolor product pixels."""
+    try:
+        with Image.open(path) as source:
+            source.seek(0)
+            image = ImageOps.exif_transpose(source).convert("RGB")
+    except (OSError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
+        raise RuntimeError("白底质量检查无法读取生成图片") from exc
+
+    image.thumbnail((320, 320), Image.Resampling.LANCZOS)
+    width, height = image.size
+    if width < 16 or height < 16:
+        raise RuntimeError("白底质量检查无法处理尺寸过小的生成图片")
+
+    patch_width = max(2, int(round(width * 0.08)))
+    patch_height = max(2, int(round(height * 0.08)))
+    corner_regions = (
+        (0, 0, patch_width, patch_height),
+        (width - patch_width, 0, width, patch_height),
+        (0, height - patch_height, patch_width, height),
+        (width - patch_width, height - patch_height, width, height),
+    )
+    edge_thickness = max(2, int(round(min(width, height) * 0.04)))
+    perimeter_regions = (
+        (0, 0, width, edge_thickness),
+        (0, height - edge_thickness, width, height),
+        (0, edge_thickness, edge_thickness, height - edge_thickness),
+        (width - edge_thickness, edge_thickness, width, height - edge_thickness),
+    )
+
+    def pixel_metrics(pixel: tuple[int, int, int]) -> tuple[float, float, float]:
+        red, green, blue = pixel
+        luminance = 0.2126 * red + 0.7152 * green + 0.0722 * blue
+        channel_spread = float(max(pixel) - min(pixel))
+        yellow_bias = ((red + green) / 2.0) - blue
+        return luminance, channel_spread, yellow_bias
+
+    def flattened_pixels(crop: Image.Image) -> list[tuple[int, int, int]]:
+        return list(
+            crop.get_flattened_data()
+            if hasattr(crop, "get_flattened_data")
+            else crop.getdata()
+        )
+
+    def region_report(pixels: list[tuple[int, int, int]]) -> Dict[str, Any]:
+        values = [pixel_metrics(pixel) for pixel in pixels]
+        count = max(1, len(values))
+        return {
+            "mean_luminance": round(sum(value[0] for value in values) / count, 2),
+            "mean_channel_spread": round(sum(value[1] for value in values) / count, 2),
+            "mean_yellow_bias": round(sum(value[2] for value in values) / count, 2),
+            "neutral_white_coverage": round(
+                sum(
+                    value[0] >= 242.0 and value[1] <= 10.0 and abs(value[2]) <= 7.0
+                    for value in values
+                )
+                / count,
+                4,
+            ),
+        }
+
+    corner_reports = []
+    for region in corner_regions:
+        crop = image.crop(region)
+        corner_reports.append(region_report(flattened_pixels(crop)))
+
+    perimeter_pixels: list[tuple[int, int, int]] = []
+    for region in perimeter_regions:
+        perimeter_pixels.extend(flattened_pixels(image.crop(region)))
+    values = [pixel_metrics(pixel) for pixel in perimeter_pixels]
+    count = max(1, len(values))
+    coverage = sum(
+        value[0] >= 242.0 and value[1] <= 10.0 and abs(value[2]) <= 7.0
+        for value in values
+    ) / count
+    mean_luminance = sum(value[0] for value in values) / count
+    mean_channel_spread = sum(value[1] for value in values) / count
+    mean_yellow_bias = sum(value[2] for value in values) / count
+    passed = (
+        coverage >= 0.9
+        and mean_luminance >= 244.0
+        and mean_channel_spread <= 8.0
+        and abs(mean_yellow_bias) <= 5.0
+        and all(
+            report["mean_luminance"] >= 241.0
+            and report["mean_channel_spread"] <= 10.0
+            and abs(report["mean_yellow_bias"]) <= 7.0
+            and report["neutral_white_coverage"] >= 0.78
+            for report in corner_reports
+        )
+    )
+    return {
+        "contract": ECOMMERCE_WHITE_BACKGROUND_CONTRACT,
+        "passed": passed,
+        "sample": "perimeter-4-percent-plus-four-corners-8-percent",
+        "edge_thickness_percent": 0.04,
+        "mean_luminance": round(mean_luminance, 2),
+        "mean_channel_spread": round(mean_channel_spread, 2),
+        "mean_yellow_bias": round(mean_yellow_bias, 2),
+        "neutral_white_coverage": round(coverage, 4),
+        "corners": corner_reports,
+    }
+
+
 async def persist_generated_assets(task: Dict[str, Any], result: Dict[str, Any]) -> Dict[str, Any]:
     if task.get("kind") == "video" and str(result.get("video_url") or "").strip():
         media_items = [{"url": str(result["video_url"]).strip(), "kind": "video"}]
@@ -2311,6 +2977,7 @@ async def persist_generated_assets(task: Dict[str, Any], result: Dict[str, Any])
         ).fetchone()
     project_id = canvas["project_id"] if canvas else ""
     output_fps = normalize_video_output_fps((task.get("options") or {}).get("output_fps"))
+    requires_neutral_white = ecommerce_task_requires_neutral_white(task)
     persisted: list[Dict[str, Any]] = []
     staged: list[Dict[str, Any]] = []
     try:
@@ -2321,6 +2988,14 @@ async def persist_generated_assets(task: Dict[str, Any], result: Dict[str, Any])
             interpolated: Optional[Path] = None
             try:
                 suffix, _size = await stream_generated_media_to_path(media["url"], kind, temporary, user_id)
+                white_background_quality = None
+                if kind == "image" and requires_neutral_white:
+                    white_background_quality = await asyncio.to_thread(
+                        inspect_ecommerce_white_background,
+                        temporary,
+                    )
+                    if not white_background_quality["passed"]:
+                        raise EcommerceWhiteBackgroundQualityError(white_background_quality)
                 if kind == "video" and output_fps:
                     interpolated = output_dir / f".{asset_id}.{uuid.uuid4().hex}.interpolated.mp4"
                     await interpolate_video_file(temporary, interpolated, output_fps)
@@ -2350,6 +3025,7 @@ async def persist_generated_assets(task: Dict[str, Any], result: Dict[str, Any])
                     "target": target,
                     "temporary": temporary,
                     "target_existed": target.exists(),
+                    "white_background_quality": white_background_quality,
                 }
             )
         for item in staged:
@@ -2396,6 +3072,16 @@ async def persist_generated_assets(task: Dict[str, Any], result: Dict[str, Any])
                 item["target"].unlink(missing_ok=True)
         raise
     response = {"items": persisted, "raw": sanitized_upstream_result(result)}
+    if requires_neutral_white:
+        response["white_background_quality"] = {
+            "contract": ECOMMERCE_WHITE_BACKGROUND_CONTRACT,
+            "status": "passed",
+            "items": [
+                item["white_background_quality"]
+                for item in staged
+                if item.get("white_background_quality")
+            ],
+        }
     if output_fps and any(item["kind"] == "video" for item in persisted):
         response["frame_interpolation"] = {
             "target_fps": output_fps,
@@ -2645,17 +3331,23 @@ def validate_video_task_submission(user_id: str, options: Optional[Dict[str, Any
 def update_task_status(task_id: str, status: str, result: Optional[Dict[str, Any]] = None, error: str = "") -> None:
     terminal = status in {"succeeded", "failed"}
     with db() as conn:
+        ts = now_ms()
         conn.execute(
             "UPDATE tasks SET status = ?, result_json = ?, error = ?, lease_until = ?, worker_id = ?, updated_at = ? WHERE id = ?",
             (
                 status,
                 json.dumps(result or {}, ensure_ascii=False),
                 str(error or "")[:2000],
-                0 if terminal else now_ms() + int_env("TASK_LEASE_SECONDS", 120) * 1000,
+                0 if terminal else ts + int_env("TASK_LEASE_SECONDS", 120) * 1000,
                 "" if terminal else WORKER_ID,
-                now_ms(),
+                ts,
                 clean_id(task_id),
             ),
+        )
+        conn.execute(
+            "UPDATE generation_batches SET updated_at = ? WHERE id = "
+            "(SELECT batch_id FROM tasks WHERE id = ?) AND (SELECT batch_id FROM tasks WHERE id = ?) <> ''",
+            (ts, clean_id(task_id), clean_id(task_id)),
         )
 
 
@@ -2674,6 +3366,11 @@ def fail_task(task_id: str, error: str) -> None:
         conn.execute(
             "UPDATE tasks SET status = ?, error = ?, lease_until = 0, worker_id = '', updated_at = ? WHERE id = ?",
             ("failed", str(error or "任务失败")[:2000], ts, clean),
+        )
+        conn.execute(
+            "UPDATE generation_batches SET updated_at = ? WHERE id = "
+            "(SELECT batch_id FROM tasks WHERE id = ?) AND (SELECT batch_id FROM tasks WHERE id = ?) <> ''",
+            (ts, clean, clean),
         )
         cost = int(row["cost"] or 0)
         if cost > 0 and not bool(row["refunded"]):
@@ -2797,8 +3494,37 @@ async def execute_claimed_task(task: Dict[str, Any], worker_id: str = WORKER_ID)
         if task["kind"] == "llm":
             result = await call_llm(task["prompt"], options, request_id)
         elif task["kind"] == "image":
-            result = await call_image(task["prompt"], options, request_id)
-            result = await persist_generated_assets(task, result)
+            normalized_image_options = normalize_task_options("image", options)
+            requires_neutral_white = ecommerce_task_requires_neutral_white(task)
+            attempts = 2 if requires_neutral_white else 1
+            reference_paths = (
+                resolve_image_edit_reference_paths(task["user_id"], options)
+                if normalized_image_options.get("operation") == "edit"
+                else []
+            )
+            for attempt_index in range(attempts):
+                attempt_request_id = request_id if attempt_index == 0 else f"{request_id}-white-retry"
+                attempt_prompt = task["prompt"]
+                if attempt_index:
+                    attempt_prompt += (
+                        "\n白底质量重试：上一结果未通过中性纯白检测。背景必须均匀为 sRGB #FFFFFF，"
+                        "禁止暖白、米黄、奶油色、灰白、渐变和任何黄色光污染。"
+                    )
+                try:
+                    if normalized_image_options.get("operation") == "edit":
+                        result = await call_image_edit(
+                            attempt_prompt,
+                            options,
+                            reference_paths,
+                            attempt_request_id,
+                        )
+                    else:
+                        result = await call_image(attempt_prompt, options, attempt_request_id)
+                    result = await persist_generated_assets(task, result)
+                    break
+                except EcommerceWhiteBackgroundQualityError:
+                    if attempt_index + 1 >= attempts:
+                        raise
         else:
             reference_images = resolve_video_reference_image_roles(task["user_id"], options)
             result = await call_video(task["prompt"], options, request_id, reference_images)
@@ -2899,6 +3625,135 @@ def build_image_payload(prompt: str, options: Optional[Dict[str, Any]], url: str
     if model and "/deployments/" not in str(url or ""):
         payload["model"] = model
     return payload
+
+
+def image_edit_url(generation_url: str) -> str:
+    parsed = urlparse(str(generation_url or "").strip())
+    path = parsed.path.rstrip("/")
+    if not path.endswith("/images/generations"):
+        raise AppError(
+            "当前生图供应商未配置兼容的 images/generations 地址，无法使用电商拍摄编辑能力",
+            400,
+        )
+    edit_path = path[: -len("generations")] + "edits"
+    return parsed._replace(path=edit_path).geturl()
+
+
+def resolve_image_edit_reference_paths(user_id: str, options: Optional[Dict[str, Any]]) -> list[Path]:
+    values = normalize_task_options("image", options)
+    if values.get("operation") != "edit":
+        return []
+    references = values.get("reference_inputs") if isinstance(values.get("reference_inputs"), dict) else {}
+    product_asset_id = clean_id(references.get("product_asset_id"))
+    if not product_asset_id:
+        raise AppError("电商拍摄缺少商品参考图")
+    with db() as conn:
+        row = _validate_ecommerce_product_asset(conn, user_id, product_asset_id)
+    paths = [Path(str(row["path"])).resolve()]
+    model_preset_id = clean_id(references.get("model_preset_id"))
+    if model_preset_id:
+        model = next((entry for entry in load_ecommerce_catalog()["models"] if entry["id"] == model_preset_id), None)
+        if not model:
+            raise AppError("电商模特参考图不存在", 404)
+        model_path = Path(model["_path"]).resolve()
+        if not model_path.is_relative_to(ECOMMERCE_MODEL_ROOT.resolve()) or not model_path.is_file():
+            raise AppError("电商模特参考图路径不安全", 503)
+        paths.append(model_path)
+    return paths
+
+
+def provider_image_part(path: Path, index: int) -> tuple[str, bytes, str]:
+    target = Path(path).resolve()
+    if not target.is_file():
+        raise AppError("图片参考文件不存在", 404)
+    if target.stat().st_size > 50 * 1024 * 1024:
+        raise AppError("单张图片参考不能超过 50MB", 413)
+    suffix = target.suffix.lower()
+    if suffix in {".jpg", ".jpeg"}:
+        return (target.name or f"reference-{index}.jpg", target.read_bytes(), "image/jpeg")
+    if suffix == ".png":
+        return (target.name or f"reference-{index}.png", target.read_bytes(), "image/png")
+    try:
+        with Image.open(target) as source:
+            source.seek(0)
+            image = ImageOps.exif_transpose(source).convert("RGBA")
+            output = io.BytesIO()
+            image.save(output, format="PNG", optimize=True)
+    except (OSError, UnidentifiedImageError, Image.DecompressionBombError) as exc:
+        raise AppError("图片参考无法读取，请重新上传 JPG、PNG、WebP 或 AVIF 图片") from exc
+    encoded = output.getvalue()
+    if len(encoded) > 50 * 1024 * 1024:
+        raise AppError("图片参考转换后超过 50MB", 413)
+    return (f"reference-{index}.png", encoded, "image/png")
+
+
+def known_image_response_items(data: Any) -> list[Dict[str, str]]:
+    raw_items = data.get("data") if isinstance(data, dict) else None
+    items: list[Dict[str, str]] = []
+    for raw in raw_items if isinstance(raw_items, list) else []:
+        if not isinstance(raw, dict):
+            continue
+        item: Dict[str, str] = {}
+        for key in ("b64_json", "url", "revised_prompt"):
+            value = raw.get(key)
+            if isinstance(value, str) and value.strip():
+                item[key] = value.strip()
+        if item.get("b64_json") or item.get("url"):
+            items.append(item)
+    return items
+
+
+async def call_image_edit(
+    prompt: str,
+    options: Optional[Dict[str, Any]],
+    reference_paths: list[Path],
+    request_id: str = "",
+) -> Dict[str, Any]:
+    if not reference_paths:
+        raise AppError("电商拍摄缺少图片参考")
+    values = normalize_task_options("image", options)
+    config = resolve_generation_provider_config("image", values.get("model", ""))
+    if runtime_provider_model("image", config):
+        values["model"] = runtime_provider_model("image", config)
+    url = image_edit_url(config["url"])
+    data: Dict[str, str] = {"prompt": str(prompt or ""), "n": "1"}
+    size = image_dimensions(values.get("ratio", "1:1"), values.get("image_size", "自适应"))
+    if size:
+        data["size"] = size
+    model = values.get("model") or str(os.getenv("IMAGE_MODEL") or "gpt-image-1").strip()
+    if model and not is_deployment_url(url):
+        data["model"] = model
+    files = [
+        ("image[]", provider_image_part(path, index))
+        for index, path in enumerate(reference_paths, start=1)
+    ]
+    try:
+        async with httpx.AsyncClient(timeout=300, follow_redirects=True) as client:
+            resp = await client.post(
+                url,
+                headers=request_headers(config["api_key"], request_id, url),
+                data=data,
+                files=files,
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+    except httpx.HTTPStatusError as exc:
+        status = int(exc.response.status_code)
+        detail = str(exc.response.text or "").strip()[:600]
+        unsupported = status in {404, 405, 501} or any(
+            phrase in detail.lower() for phrase in ("not supported", "unsupported", "unknown endpoint")
+        )
+        if unsupported:
+            raise RuntimeError(
+                "当前生图供应商或模型不支持图片编辑（images/edits），请在管理员后台配置支持编辑的接口"
+            ) from exc
+        raise RuntimeError(f"图片编辑请求失败（HTTP {status}）：{detail or '供应商未返回错误详情'}") from exc
+    except (httpx.HTTPError, ValueError) as exc:
+        raise RuntimeError(f"图片编辑请求失败：{str(exc)[:600]}") from exc
+    items = known_image_response_items(payload)
+    if not items:
+        raise RuntimeError("图片编辑接口未返回可用的图片结果")
+    return {"raw": {"data": items}, "items": items}
 
 
 def normalized_video_reference_image_roles(
@@ -3333,6 +4188,26 @@ class TaskPayload(BaseModel):
     options: Dict[str, Any] = Field(default_factory=dict)
 
 
+class EcommerceBatchItemPayload(BaseModel):
+    product_asset_id: str = Field(min_length=1, max_length=80)
+    model_preset_id: str = Field(default="", max_length=80)
+    custom_model_prompt: str = Field(default="", max_length=800)
+    environment: str = Field(default="white", max_length=20)
+    scene_preset_id: str = Field(default="", max_length=80)
+    custom_scene_prompt: str = Field(default="", max_length=800)
+    shot: str = Field(default="full", max_length=20)
+    pose: str = Field(default="", max_length=400)
+    ratio: str = Field(default="3:4", max_length=20)
+    image_size: str = Field(default="2K", max_length=20)
+
+
+class EcommerceBatchPayload(BaseModel):
+    client_request_id: str = Field(min_length=1, max_length=80)
+    canvas_id: str = Field(default="", max_length=80)
+    items: list[EcommerceBatchItemPayload] = Field(min_length=1, max_length=20)
+    model: str = Field(default="", max_length=120)
+
+
 class WorkflowTemplatePayload(BaseModel):
     name: str = Field(default="", max_length=100)
     payload: Dict[str, Any] = Field(default_factory=dict)
@@ -3381,6 +4256,12 @@ app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
+    if (
+        request.url.path.startswith("/static/")
+        and request.query_params.get("v")
+        and (200 <= response.status_code < 300 or response.status_code == 304)
+    ):
+        response.headers["Cache-Control"] = VERSIONED_STATIC_CACHE_CONTROL
     response.headers.setdefault("X-Content-Type-Options", "nosniff")
     response.headers.setdefault("X-Frame-Options", "DENY")
     response.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
@@ -3694,6 +4575,63 @@ async def api_delete_asset(asset_id: str, request: Request):
     if not delete_asset(user["id"], asset_id):
         raise HTTPException(status_code=404, detail="素材不存在")
     return {"ok": True, "storage": user_storage_summary(user["id"])}
+
+
+@app.get("/api/ecommerce/catalog")
+async def api_ecommerce_catalog(request: Request):
+    require_user(request)
+    return public_ecommerce_catalog()
+
+
+@app.post("/api/ecommerce/batches")
+async def api_create_ecommerce_batch(payload: EcommerceBatchPayload, request: Request):
+    user = require_user(request)
+    item_payloads = [
+        item.model_dump() if hasattr(item, "model_dump") else item.dict()
+        for item in payload.items
+    ]
+    batch, created = create_ecommerce_batch(
+        user["id"],
+        payload.client_request_id,
+        item_payloads,
+        canvas_id=payload.canvas_id,
+        model=payload.model,
+    )
+    if created:
+        wake_task_worker()
+    return {
+        "batch": batch,
+        "created": created,
+        "balance": credit_balance(user["id"]),
+    }
+
+
+@app.get("/api/ecommerce/batches")
+async def api_ecommerce_batches(
+    request: Request,
+    canvas_id: str = "",
+    active_only: bool = False,
+    limit: int = Query(default=10, ge=1, le=20),
+):
+    user = require_user(request)
+    return {
+        "batches": list_ecommerce_batches(
+            user["id"],
+            canvas_id=canvas_id,
+            active_only=active_only,
+            limit=limit,
+        ),
+        "balance": credit_balance(user["id"]),
+    }
+
+
+@app.get("/api/ecommerce/batches/{batch_id}")
+async def api_ecommerce_batch(batch_id: str, request: Request):
+    user = require_user(request)
+    batch = get_ecommerce_batch(user["id"], batch_id)
+    if not batch:
+        raise HTTPException(status_code=404, detail="电商拍摄批次不存在")
+    return {"batch": batch, "balance": credit_balance(user["id"])}
 
 
 @app.post("/api/tasks")

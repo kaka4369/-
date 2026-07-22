@@ -13,14 +13,14 @@
       document.documentElement.dataset.theme = 'light';
     }
   </script>
-  <link rel="stylesheet" href="/static/vendor/phosphor/phosphor.css?v=20260721-editor-discard2" />
-  <link rel="stylesheet" href="/static/app.css?v=20260721-editor-discard2" />
+  <link rel="stylesheet" href="/static/vendor/phosphor/phosphor.css?v=20260723-performance1" />
+  <link rel="stylesheet" href="/static/app.css?v=20260723-performance1" />
 </head>
 <body>
   <div class="app-shell">
     <aside class="app-sidebar" aria-label="工作台导航">
       <button id="backToOriginBtn" class="brand-chip sidebar-brand" type="button" title="返回云芝画布" aria-label="返回云芝画布">
-        <span class="brand-mark brand-avatar-shell" aria-hidden="true"><img class="brand-avatar" src="/static/brand/yunzhi-avatar.png" alt="" /></span>
+        <span class="brand-mark brand-avatar-shell" aria-hidden="true"><img class="brand-avatar" src="/static/brand/yunzhi-avatar.webp?v=20260723-performance1" alt="" width="256" height="256" decoding="async" loading="eager" /></span>
         <span>
           <strong>云芝画布</strong>
           <small>AI 视觉创作工作台</small>
@@ -28,7 +28,7 @@
       </button>
       <nav class="sidebar-nav" aria-label="工作区与页面">
         <div class="workspace-cluster sidebar-workspaces">
-          <div class="workspace-menu">
+          <div class="workspace-menu project-workspace-menu hidden" hidden aria-hidden="true">
             <button class="workspace-trigger" type="button" aria-label="项目空间，项目用于组织多个画布" title="项目用于组织多个画布">
               <i class="ph ph-folder-simple" aria-hidden="true"></i>
               <span>项目空间</span>
@@ -52,6 +52,7 @@
           </div>
         </div>
         <div class="sidebar-actions">
+          <button id="ecommerceBtn" type="button" data-dock-action="ecommerce" aria-haspopup="dialog" aria-controls="ecommerceStudioModal" aria-expanded="false" aria-label="电商拍摄" title="电商拍摄"><i class="ph ph-sparkle" aria-hidden="true"></i><span>电商拍摄</span><small id="ecommerceTaskBadge" class="ecommerce-task-badge hidden" aria-live="polite"></small></button>
           <button id="assetBtn" type="button" aria-label="资产库" title="资产库"><i class="ph ph-images" aria-hidden="true"></i><span>&#36164;&#20135;&#24211;</span></button>
           <button id="logBtn" type="button" aria-label="运行日志" title="运行日志"><i class="ph ph-clock-counter-clockwise" aria-hidden="true"></i><span>&#26085;&#24535;</span></button>
           <button id="themeToggleBtn" class="theme-toggle" type="button" aria-pressed="false" aria-label="切换到黑夜模式"><i class="ph ph-moon" aria-hidden="true"></i><span>黑夜</span></button>
@@ -136,11 +137,6 @@
               <strong>上传</strong>
               <small>素材</small>
             </button>
-            <button type="button" data-dock-action="assets">
-              <i class="ph ph-images dock-icon" aria-hidden="true"></i>
-              <strong>资产</strong>
-              <small>管理</small>
-            </button>
           </div>
         </div>
         <div class="top-actions">
@@ -162,7 +158,7 @@
         </div>
         <div id="selectionBox" class="selection-box hidden"></div>
         <div id="emptyHint" class="empty-hint">
-          <span class="empty-hint-avatar brand-avatar-shell" aria-hidden="true"><img class="brand-avatar" src="/static/brand/yunzhi-avatar.png" alt="" /></span>
+          <span class="empty-hint-avatar brand-avatar-shell" aria-hidden="true"><img class="brand-avatar" src="/static/brand/yunzhi-avatar.webp?v=20260723-performance1" alt="" width="256" height="256" decoding="async" loading="eager" /></span>
           <strong>云芝陪你开始创作</strong>
           <span>&#28155;&#21152;&#33410;&#28857;&#65292;&#25302;&#21160;&#31471;&#21475;&#36830;&#32447;&#65292;&#25110;&#19978;&#20256;&#32032;&#26448;&#24314;&#31435;&#27969;&#31243;</span>
         </div>
@@ -500,6 +496,212 @@
     </section>
   </div>
 
+  <div id="ecommerceStudioModal" class="modal ecommerce-studio-modal hidden" role="dialog" aria-modal="true" aria-labelledby="ecommerceStudioTitle" aria-describedby="ecommerceStudioDescription">
+    <section class="ecommerce-studio-card">
+      <header class="ecommerce-studio-header">
+        <div>
+          <span class="modal-kicker">独立工作区 · AI 电商拍摄</span>
+          <h2 id="ecommerceStudioTitle">一键生成模特商品图</h2>
+          <p id="ecommerceStudioDescription">只使用本次上传的商品款式，不读取画布或素材库历史内容；生成后可查看大图并继续本地微调。</p>
+        </div>
+        <div class="ecommerce-studio-header-actions">
+          <span class="ecommerce-session-badge"><i class="ph ph-shield-check" aria-hidden="true"></i>本次拍摄独立</span>
+          <button id="ecommerceStudioCloseBtn" class="ecommerce-back-button" type="button" aria-label="返回画布" title="返回画布"><i class="ph ph-arrow-left" aria-hidden="true"></i><span>返回画布</span></button>
+        </div>
+      </header>
+
+      <div class="ecommerce-studio-scroll">
+        <section class="ecommerce-step" aria-labelledby="ecommerceModelsTitle">
+          <div class="ecommerce-step-head"><div><span>01</span><strong id="ecommerceModelsTitle">选择模特</strong></div></div>
+          <div class="ecommerce-choice-row" role="radiogroup" aria-label="模特来源">
+            <button type="button" data-ecommerce-model-group="domestic" aria-pressed="true">国内模特 <small>5 女 · 5 男</small></button>
+            <button type="button" data-ecommerce-model-group="international" aria-pressed="false">国际模特 <small>5 女 · 5 男</small></button>
+            <button type="button" data-ecommerce-model-group="custom" aria-pressed="false"><i class="ph ph-sparkle" aria-hidden="true"></i>自定义模特</button>
+          </div>
+          <div id="ecommerceModelGrid" class="ecommerce-model-grid" role="radiogroup" aria-label="内置模特"></div>
+          <label id="ecommerceCustomModelPanel" class="ecommerce-prompt-field hidden">
+            <span>描述你想要的模特</span>
+            <textarea id="ecommerceCustomModelPrompt" rows="3" maxlength="600" placeholder="例如：30 岁亚洲女性模特，利落短发，健康自然肤色，气质干练，身材高挑……"></textarea>
+            <small>生成时会把这段描述作为模特身份约束，并尽量在同一批次保持一致。</small>
+          </label>
+        </section>
+
+        <section class="ecommerce-step" aria-labelledby="ecommerceEnvironmentTitle">
+          <div class="ecommerce-step-head"><div><span>02</span><strong id="ecommerceEnvironmentTitle">选择拍摄环境</strong></div></div>
+          <div class="ecommerce-choice-row" role="radiogroup" aria-label="拍摄环境">
+            <button type="button" data-ecommerce-environment="white" aria-pressed="true"><i class="ph ph-image" aria-hidden="true"></i>白底棚拍</button>
+            <button type="button" data-ecommerce-environment="outdoor" aria-pressed="false"><i class="ph ph-sun" aria-hidden="true"></i>室外拍摄</button>
+          </div>
+          <div id="ecommerceWhitePanel" class="ecommerce-white-panel">
+            <button id="ecommerceWhiteExampleBtn" class="ecommerce-white-example-card" type="button" aria-haspopup="dialog" aria-controls="ecommerceImagePreviewModal" aria-label="查看标准纯白棚拍案例大图">
+              <span class="ecommerce-white-example-media"><img src="/static/ecommerce/scenes/white-studio-example.png" alt="" loading="lazy" /></span>
+              <span class="ecommerce-white-example-copy">
+                <span class="ecommerce-example-eyebrow">案例预览</span>
+                <strong>标准纯白棚拍</strong>
+                <small>纯白无缝背景 · 柔和正面光 · 全身商品展示</small>
+              </span>
+              <span class="ecommerce-example-open" aria-hidden="true"><i class="ph ph-image"></i>查看大图</span>
+            </button>
+          </div>
+          <div id="ecommerceOutdoorPanel" class="ecommerce-outdoor-panel hidden">
+            <div id="ecommerceSceneGrid" class="ecommerce-scene-grid" role="radiogroup" aria-label="室外场景"></div>
+            <button id="ecommerceCustomSceneBtn" class="ecommerce-custom-scene-button" type="button" aria-pressed="false"><i class="ph ph-sparkle" aria-hidden="true"></i><span><strong>生成场景</strong><small>自己描述地点、光线与氛围</small></span></button>
+            <label id="ecommerceCustomScenePanel" class="ecommerce-prompt-field hidden">
+              <span>描述拍摄场景</span>
+              <textarea id="ecommerceCustomScenePrompt" rows="3" maxlength="600" placeholder="例如：傍晚的上海梧桐街区，柔和侧逆光，干净的人行道，轻奢街拍氛围……"></textarea>
+            </label>
+          </div>
+        </section>
+
+        <section class="ecommerce-step" aria-labelledby="ecommerceStylesTitle">
+          <div class="ecommerce-step-head">
+            <div><span>03</span><strong id="ecommerceStylesTitle">选择要拍摄的款式</strong></div>
+            <div class="ecommerce-step-actions">
+              <small id="ecommerceStyleCount">已选 0 / 20 款</small>
+              <label id="ecommerceUploadBtn" class="ghost-button compact ecommerce-upload-control" aria-disabled="false">
+                <input id="ecommerceFileInput" type="file" accept="image/*" multiple />
+                <span id="ecommerceUploadLabel"><i class="ph ph-upload-simple" aria-hidden="true"></i>上传款式</span>
+              </label>
+            </div>
+          </div>
+          <p class="ecommerce-step-copy">一次可上传多张商品图，最多 20 款；这里只显示本次上传的内容，不会带入画布或素材库中的旧图片。</p>
+          <div id="ecommerceStyleGrid" class="ecommerce-style-grid" aria-label="本次上传款式多选" aria-live="polite"></div>
+        </section>
+
+        <section class="ecommerce-step" aria-labelledby="ecommerceFineTuneTitle">
+          <div class="ecommerce-step-head"><div><span>04</span><strong id="ecommerceFineTuneTitle">批量构图微调</strong></div><small>每款固定 1 张</small></div>
+          <div class="ecommerce-tune-grid">
+            <fieldset class="ecommerce-ratio-field">
+              <legend>画面比例 <small>竖版 · 方形 · 横版</small></legend>
+              <div class="ecommerce-ratio-grid" role="group" aria-label="画面比例，选择一个常用构图比例">
+                <button type="button" data-ecommerce-ratio="3:4" aria-pressed="true" aria-label="3 比 4，竖版主图">
+                  <span class="ecommerce-ratio-mark is-portrait" style="--ratio-width: 18px; --ratio-height: 24px" aria-hidden="true"></span>
+                  <span><strong>3:4</strong><small>竖版主图</small></span>
+                </button>
+                <button type="button" data-ecommerce-ratio="4:5" aria-pressed="false" aria-label="4 比 5，竖版详情">
+                  <span class="ecommerce-ratio-mark is-portrait" style="--ratio-width: 19px; --ratio-height: 24px" aria-hidden="true"></span>
+                  <span><strong>4:5</strong><small>竖版详情</small></span>
+                </button>
+                <button type="button" data-ecommerce-ratio="2:3" aria-pressed="false" aria-label="2 比 3，全身人像">
+                  <span class="ecommerce-ratio-mark is-portrait" style="--ratio-width: 16px; --ratio-height: 24px" aria-hidden="true"></span>
+                  <span><strong>2:3</strong><small>全身人像</small></span>
+                </button>
+                <button type="button" data-ecommerce-ratio="9:16" aria-pressed="false" aria-label="9 比 16，手机竖屏">
+                  <span class="ecommerce-ratio-mark is-portrait" style="--ratio-width: 14px; --ratio-height: 25px" aria-hidden="true"></span>
+                  <span><strong>9:16</strong><small>手机竖屏</small></span>
+                </button>
+                <button type="button" data-ecommerce-ratio="1:1" aria-pressed="false" aria-label="1 比 1，方形封面">
+                  <span class="ecommerce-ratio-mark is-square" style="--ratio-width: 22px; --ratio-height: 22px" aria-hidden="true"></span>
+                  <span><strong>1:1</strong><small>方形封面</small></span>
+                </button>
+                <button type="button" data-ecommerce-ratio="4:3" aria-pressed="false" aria-label="4 比 3，横版详情">
+                  <span class="ecommerce-ratio-mark is-landscape" style="--ratio-width: 27px; --ratio-height: 20px" aria-hidden="true"></span>
+                  <span><strong>4:3</strong><small>横版详情</small></span>
+                </button>
+                <button type="button" data-ecommerce-ratio="3:2" aria-pressed="false" aria-label="3 比 2，商业横图">
+                  <span class="ecommerce-ratio-mark is-landscape" style="--ratio-width: 28px; --ratio-height: 19px" aria-hidden="true"></span>
+                  <span><strong>3:2</strong><small>商业横图</small></span>
+                </button>
+                <button type="button" data-ecommerce-ratio="16:9" aria-pressed="false" aria-label="16 比 9，宽幅横图">
+                  <span class="ecommerce-ratio-mark is-landscape" style="--ratio-width: 30px; --ratio-height: 17px" aria-hidden="true"></span>
+                  <span><strong>16:9</strong><small>宽幅横图</small></span>
+                </button>
+              </div>
+            </fieldset>
+            <fieldset class="ecommerce-shot-field">
+              <legend>镜头</legend>
+              <div class="ecommerce-segmented" role="group" aria-label="镜头景别">
+                <button type="button" data-ecommerce-shot="full" aria-pressed="true">全身</button>
+                <button type="button" data-ecommerce-shot="half" aria-pressed="false">半身</button>
+                <button type="button" data-ecommerce-shot="detail" aria-pressed="false">细节</button>
+                <button type="button" data-ecommerce-shot="back" aria-pressed="false">背面</button>
+              </div>
+            </fieldset>
+            <fieldset class="ecommerce-pose-field">
+              <legend>动作姿势 <small>示意图仅表示动作方向</small></legend>
+              <div class="ecommerce-pose-grid" role="group" aria-label="模特动作姿势，选择一个动作">
+                <button type="button" data-ecommerce-pose="auto" aria-pressed="true" aria-label="自动，智能选择适合服装的姿势">
+                  <svg viewBox="0 0 44 56" aria-hidden="true"><circle cx="22" cy="9" r="4"/><path d="M22 14v19M14 20l8 5 8-5M22 33l-7 15M22 33l7 15"/><path class="ecommerce-pose-accent" d="m33 7 1.2 2.6L37 11l-2.8 1.2L33 15l-1.2-2.8L29 11l2.8-1.4Z"/></svg>
+                  <span><strong>自动</strong><small>智能匹配</small></span>
+                </button>
+                <button type="button" data-ecommerce-pose="front" aria-pressed="false" aria-label="正面站姿">
+                  <svg viewBox="0 0 44 56" aria-hidden="true"><circle cx="22" cy="8" r="4"/><path d="M22 13v20M14 18h16M14 18l-3 17M30 18l3 17M22 33l-7 16M22 33l7 16"/></svg>
+                  <span><strong>正面</strong><small>标准站姿</small></span>
+                </button>
+                <button type="button" data-ecommerce-pose="three-quarter" aria-pressed="false" aria-label="四分之三侧转姿势">
+                  <svg viewBox="0 0 44 56" aria-hidden="true"><circle cx="21" cy="8" r="4"/><path d="M20 13l3 20M14 19l14-2M14 19l-1 16M28 17l5 15M23 33l-5 16M23 33l9 14"/><path class="ecommerce-pose-accent" d="M30 7c3 1 5 3 6 6"/></svg>
+                  <span><strong>侧转</strong><small>45° 展示</small></span>
+                </button>
+                <button type="button" data-ecommerce-pose="side" aria-pressed="false" aria-label="侧面站姿">
+                  <svg viewBox="0 0 44 56" aria-hidden="true"><circle cx="21" cy="8" r="4"/><path d="M22 13l1 20M18 18l7 1M20 18l5 16M23 33l-3 16M23 33l7 15"/><path class="ecommerce-pose-accent" d="M25 7h5"/></svg>
+                  <span><strong>侧面</strong><small>侧廓线条</small></span>
+                </button>
+                <button type="button" data-ecommerce-pose="back" aria-pressed="false" aria-label="背面站姿">
+                  <svg viewBox="0 0 44 56" aria-hidden="true"><circle cx="22" cy="8" r="4"/><path d="M22 13v20M14 18h16M14 18l-2 17M30 18l2 17M22 33l-7 16M22 33l7 16"/><path class="ecommerce-pose-accent" d="M18 8c1-3 7-3 8 0M17 18l5 4 5-4"/></svg>
+                  <span><strong>背面</strong><small>后背结构</small></span>
+                </button>
+                <button type="button" data-ecommerce-pose="weight-shift" aria-pressed="false" aria-label="重心侧移站姿">
+                  <svg viewBox="0 0 44 56" aria-hidden="true"><circle cx="20" cy="8" r="4"/><path d="M20 13l4 19M14 18l12-2M14 18l-4 15M26 16l7 14M24 32l-8 16M24 32l4 17"/><path class="ecommerce-pose-accent" d="M14 49h6M26 50h6"/></svg>
+                  <span><strong>侧重心</strong><small>轻松站姿</small></span>
+                </button>
+                <button type="button" data-ecommerce-pose="walking" aria-pressed="false" aria-label="自然行走姿势">
+                  <svg viewBox="0 0 44 56" aria-hidden="true"><circle cx="21" cy="8" r="4"/><path d="M21 13l2 19M15 18l12 3M15 18l-6 12M27 21l7 10M23 32l-12 14M23 32l10 16"/><path class="ecommerce-pose-accent" d="M7 47h7M31 49h7"/></svg>
+                  <span><strong>行走</strong><small>动态抓拍</small></span>
+                </button>
+                <button type="button" data-ecommerce-pose="arms-open" aria-pressed="false" aria-label="展袖站姿">
+                  <svg viewBox="0 0 44 56" aria-hidden="true"><circle cx="22" cy="8" r="4"/><path d="M22 13v20M15 18h14M15 18 5 27M29 18l10 9M22 33l-7 16M22 33l7 16"/><path class="ecommerce-pose-accent" d="M3 24v6M41 24v6"/></svg>
+                  <span><strong>展袖</strong><small>展示袖型</small></span>
+                </button>
+                <button type="button" data-ecommerce-pose="turn-look" aria-pressed="false" aria-label="转身回望姿势">
+                  <svg viewBox="0 0 44 56" aria-hidden="true"><circle cx="26" cy="8" r="4"/><path d="M23 13l-2 20M14 19l14-2M14 19l-2 16M28 17l5 15M21 33l-7 16M21 33l8 15"/><path class="ecommerce-pose-accent" d="M20 7c-3 1-5 3-6 6M25 9l4-1"/></svg>
+                  <span><strong>回望</strong><small>背侧同框</small></span>
+                </button>
+              </div>
+            </fieldset>
+          </div>
+          <p id="ecommerceTuneSummary" class="ecommerce-tune-summary" role="status" aria-live="polite">当前构图：3:4 · 全身 · 自动姿势</p>
+        </section>
+
+        <section id="ecommerceBatchPanel" class="ecommerce-step ecommerce-batch-panel hidden" aria-labelledby="ecommerceBatchTitle">
+          <div class="ecommerce-step-head">
+            <div><span><i class="ph ph-spinner-gap" aria-hidden="true"></i></span><strong id="ecommerceBatchTitle">拍摄任务</strong></div>
+            <button id="ecommerceNewBatchBtn" class="ghost-button compact hidden" type="button">新建一批</button>
+          </div>
+          <div id="ecommerceBatchSummary" class="ecommerce-batch-summary" role="status"></div>
+          <div id="ecommerceBatchItems" class="ecommerce-batch-items"></div>
+        </section>
+      </div>
+
+      <footer class="ecommerce-studio-footer">
+        <div>
+          <strong id="ecommerceEstimate">0 款 · 预计 0 点</strong>
+          <span id="ecommerceReadyHint">请先选择至少 1 款商品图</span>
+        </div>
+        <div>
+          <button id="ecommerceTrialBtn" class="ghost-button hidden" type="button">先试拍 1 款</button>
+          <button id="ecommerceGenerateBtn" class="primary-button" type="button" disabled><i class="ph ph-sparkle" aria-hidden="true"></i><span>开始拍摄</span></button>
+        </div>
+      </footer>
+    </section>
+  </div>
+
+  <div id="ecommerceImagePreviewModal" class="modal ecommerce-image-preview-modal hidden" role="dialog" aria-modal="true" aria-labelledby="ecommerceImagePreviewTitle" aria-describedby="ecommerceImagePreviewDescription">
+    <section class="ecommerce-image-preview-card">
+      <header>
+        <div>
+          <span id="ecommerceImagePreviewKicker" class="modal-kicker">模特大图</span>
+          <h3 id="ecommerceImagePreviewTitle">模特预览</h3>
+        </div>
+        <button id="ecommerceImagePreviewCloseBtn" class="editor-icon-button" type="button" aria-label="关闭大图" title="关闭"><i class="ph ph-x" aria-hidden="true"></i></button>
+      </header>
+      <div class="ecommerce-image-preview-stage">
+        <img id="ecommerceImagePreviewImage" src="" alt="" />
+      </div>
+      <p id="ecommerceImagePreviewDescription">点击下方“选择此模特”后用于本批商品拍摄。</p>
+      <button id="ecommerceImagePreviewSelectBtn" class="primary-button" type="button"><i class="ph ph-check" aria-hidden="true"></i><span>选择此模特</span></button>
+    </section>
+  </div>
+
   <div id="canvasCreateModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="canvasCreateTitle">
     <form id="canvasCreateForm" class="modal-card canvas-create-card">
       <button id="canvasCreateCloseBtn" class="icon-close" type="button" aria-label="关闭"><i class="ph ph-x" aria-hidden="true"></i></button>
@@ -519,6 +721,6 @@
   <div id="toastRegion" class="toast-region" aria-live="polite" aria-atomic="false"></div>
 
   <input id="fileInput" type="file" accept="image/*,video/*" hidden />
-  <script src="/static/app.js?v=20260721-editor-discard2"></script>
+  <script src="/static/app.js?v=20260723-performance1"></script>
 </body>
 </html>

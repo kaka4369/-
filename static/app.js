@@ -135,6 +135,42 @@
     directorRecipeBtn: document.getElementById('directorRecipeBtn'),
     edgeLayer: document.getElementById('edgeLayer'),
     emptyHint: document.getElementById('emptyHint'),
+    ecommerceBatchItems: document.getElementById('ecommerceBatchItems'),
+    ecommerceBatchPanel: document.getElementById('ecommerceBatchPanel'),
+    ecommerceBatchSummary: document.getElementById('ecommerceBatchSummary'),
+    ecommerceBatchTitle: document.getElementById('ecommerceBatchTitle'),
+    ecommerceBtn: document.getElementById('ecommerceBtn'),
+    ecommerceTaskBadge: document.getElementById('ecommerceTaskBadge'),
+    ecommerceCustomModelPanel: document.getElementById('ecommerceCustomModelPanel'),
+    ecommerceCustomModelPrompt: document.getElementById('ecommerceCustomModelPrompt'),
+    ecommerceCustomSceneBtn: document.getElementById('ecommerceCustomSceneBtn'),
+    ecommerceCustomScenePanel: document.getElementById('ecommerceCustomScenePanel'),
+    ecommerceCustomScenePrompt: document.getElementById('ecommerceCustomScenePrompt'),
+    ecommerceEstimate: document.getElementById('ecommerceEstimate'),
+    ecommerceFileInput: document.getElementById('ecommerceFileInput'),
+    ecommerceGenerateBtn: document.getElementById('ecommerceGenerateBtn'),
+    ecommerceImagePreviewCloseBtn: document.getElementById('ecommerceImagePreviewCloseBtn'),
+    ecommerceImagePreviewDescription: document.getElementById('ecommerceImagePreviewDescription'),
+    ecommerceImagePreviewImage: document.getElementById('ecommerceImagePreviewImage'),
+    ecommerceImagePreviewKicker: document.getElementById('ecommerceImagePreviewKicker'),
+    ecommerceImagePreviewModal: document.getElementById('ecommerceImagePreviewModal'),
+    ecommerceImagePreviewSelectBtn: document.getElementById('ecommerceImagePreviewSelectBtn'),
+    ecommerceImagePreviewTitle: document.getElementById('ecommerceImagePreviewTitle'),
+    ecommerceModelGrid: document.getElementById('ecommerceModelGrid'),
+    ecommerceNewBatchBtn: document.getElementById('ecommerceNewBatchBtn'),
+    ecommerceOutdoorPanel: document.getElementById('ecommerceOutdoorPanel'),
+    ecommerceReadyHint: document.getElementById('ecommerceReadyHint'),
+    ecommerceSceneGrid: document.getElementById('ecommerceSceneGrid'),
+    ecommerceStudioCloseBtn: document.getElementById('ecommerceStudioCloseBtn'),
+    ecommerceStudioModal: document.getElementById('ecommerceStudioModal'),
+    ecommerceStyleCount: document.getElementById('ecommerceStyleCount'),
+    ecommerceStyleGrid: document.getElementById('ecommerceStyleGrid'),
+    ecommerceTuneSummary: document.getElementById('ecommerceTuneSummary'),
+    ecommerceTrialBtn: document.getElementById('ecommerceTrialBtn'),
+    ecommerceUploadBtn: document.getElementById('ecommerceUploadBtn'),
+    ecommerceUploadLabel: document.getElementById('ecommerceUploadLabel'),
+    ecommerceWhiteExampleBtn: document.getElementById('ecommerceWhiteExampleBtn'),
+    ecommerceWhitePanel: document.getElementById('ecommerceWhitePanel'),
     exportWorkflowBtn: document.getElementById('exportWorkflowBtn'),
     fileInput: document.getElementById('fileInput'),
     groupBtn: document.getElementById('groupBtn'),
@@ -252,6 +288,15 @@
   let mediaEditor = null;
   let mediaEditorRenderRaf = 0;
   let mediaEditorReturnFocus = null;
+  let ecommerceStudio = createEcommerceStudioState();
+  let ecommercePollTimer = 0;
+  let ecommercePollInFlight = false;
+  const ecommerceBackgroundBatches = new Map();
+  const ecommerceReviewedBatchIds = new Set();
+  let ecommerceReturnFocus = null;
+  let ecommercePreviewReturnFocus = null;
+  let ecommercePreviewReturnTaskId = '';
+  let ecommercePreviewModelId = '';
 
   const MEDIA_EDITOR_DEFAULTS = Object.freeze({
     ratio: 'original',
@@ -943,6 +988,9 @@
     await loadTasks();
     await loadAssets();
     await loadWorkflowTemplates();
+    await recoverEcommerceBackgroundBatches(currentCanvas.id).catch((error) => {
+      addLog({ level: 'warning', title: '后台拍摄状态暂未同步', detail: error?.message || '稍后返回页面时会自动重试' });
+    });
   }
 
   async function waitForCanvasSaveToSettle(canvasId) {
@@ -4042,6 +4090,756 @@
     return uniqueAssets([...nodeAssets, ...assetCache]);
   }
 
+  function createEcommerceStudioState() {
+    return {
+      catalog: null,
+      catalogLoading: false,
+      sessionCanvasId: '',
+      sessionStyleIds: new Set(),
+      sessionAssets: new Map(),
+      selectedStyleIds: new Set(),
+      modelGroup: 'domestic',
+      modelPresetId: '',
+      customModelPrompt: '',
+      environment: 'white',
+      scenePresetId: '',
+      customScene: false,
+      customScenePrompt: '',
+      ratio: '3:4',
+      shot: 'full',
+      pose: 'auto',
+      submitting: false,
+      uploading: false,
+      batch: null,
+      submittedAssetIds: [],
+      insertedTaskIds: new Set(),
+      insertedNodeIds: new Map(),
+      outputOrigin: null,
+      pollFailures: 0
+    };
+  }
+
+  function ecommerceImageAssets() {
+    return uniqueAssets(assetCache.filter((asset) => asset?.kind === 'image' && asset?.id && asset?.url));
+  }
+
+  function ecommerceAssetById(assetId) {
+    const id = String(assetId || '');
+    return ecommerceStudio.sessionAssets.get(id)
+      || ecommerceImageAssets().find((asset) => String(asset.id) === id)
+      || null;
+  }
+
+  function ecommerceSessionImageAssets() {
+    return [...ecommerceStudio.sessionStyleIds]
+      .map((assetId) => ecommerceAssetById(assetId))
+      .filter((asset) => asset?.kind === 'image' && asset?.id && asset?.url);
+  }
+
+  function ecommerceModelGroup(model) {
+    const group = String(model?.group || '').toLowerCase();
+    return /international|foreign|global|国外|国际/.test(group) ? 'international' : 'domestic';
+  }
+
+  function ecommerceModels(group = ecommerceStudio.modelGroup) {
+    const models = Array.isArray(ecommerceStudio.catalog?.models) ? ecommerceStudio.catalog.models : [];
+    return models.filter((model) => ecommerceModelGroup(model) === group);
+  }
+
+  function ecommerceScenes() {
+    return Array.isArray(ecommerceStudio.catalog?.scenes) ? ecommerceStudio.catalog.scenes : [];
+  }
+
+  function ecommerceImageCost() {
+    return Math.max(0, Number(ecommerceStudio.catalog?.image_cost || 5));
+  }
+
+  function setPressedGroup(selector, activeValue, datasetKey) {
+    document.querySelectorAll(selector).forEach((button) => {
+      button.setAttribute('aria-pressed', button.dataset[datasetKey] === activeValue ? 'true' : 'false');
+    });
+  }
+
+  function resetEcommerceStudioSession(canvasId = currentCanvas?.id || '') {
+    const catalog = ecommerceStudio.catalog;
+    ecommerceStudio = createEcommerceStudioState();
+    ecommerceStudio.catalog = catalog;
+    ecommerceStudio.catalogLoading = !catalog;
+    ecommerceStudio.sessionCanvasId = String(canvasId || '');
+  }
+
+  function ensureEcommerceDefaults() {
+    const models = ecommerceModels();
+    if (!models.some((model) => String(model.id) === String(ecommerceStudio.modelPresetId))) {
+      ecommerceStudio.modelPresetId = models[0]?.id ? String(models[0].id) : '';
+    }
+    const scenes = ecommerceScenes();
+    if (!scenes.some((scene) => String(scene.id) === String(ecommerceStudio.scenePresetId))) {
+      ecommerceStudio.scenePresetId = scenes[0]?.id ? String(scenes[0].id) : '';
+    }
+  }
+
+  function ecommercePrerequisite(count = ecommerceStudio.selectedStyleIds.size) {
+    if (ecommerceStudio.catalogLoading) return '正在加载模特与场景…';
+    if (!ecommerceStudio.catalog) return '拍摄配置加载失败，请重试';
+    if (!count) return '请先选择至少 1 款商品图';
+    if (ecommerceStudio.modelGroup === 'custom' && !ecommerceStudio.customModelPrompt.trim()) return '请填写自定义模特描述';
+    if (ecommerceStudio.modelGroup !== 'custom' && !ecommerceStudio.modelPresetId) return '请选择 1 位模特';
+    if (ecommerceStudio.environment === 'outdoor' && ecommerceStudio.customScene && !ecommerceStudio.customScenePrompt.trim()) return '请填写要生成的室外场景';
+    if (ecommerceStudio.environment === 'outdoor' && !ecommerceStudio.customScene && !ecommerceStudio.scenePresetId) return '请选择 1 个室外场景';
+    const cost = count * ecommerceImageCost();
+    if (Number(me?.credits || 0) < cost) return `点数不足：本次需要 ${cost} 点，当前剩余 ${Number(me?.credits || 0)} 点`;
+    if (ecommerceStudio.uploading) return '款式正在上传，请稍候';
+    if (ecommerceStudio.submitting) return '正在创建拍摄任务…';
+    if (ecommerceStudio.batch && !ecommerceBatchTerminal(ecommerceStudio.batch)) return '当前批次仍在拍摄中';
+    return '';
+  }
+
+  function renderEcommerceStyles() {
+    const assets = ecommerceSessionImageAssets();
+    [...ecommerceStudio.selectedStyleIds].forEach((id) => {
+      if (!assets.some((asset) => String(asset.id) === id)) ecommerceStudio.selectedStyleIds.delete(id);
+    });
+    els.ecommerceStyleCount.textContent = `已选 ${ecommerceStudio.selectedStyleIds.size} / 20 款`;
+    if (!assets.length) {
+      els.ecommerceStyleGrid.innerHTML = `
+        <div class="ecommerce-empty-gallery">
+          <span><i class="ph ph-upload-simple" aria-hidden="true"></i></span>
+          <strong>从本次商品款式开始</strong>
+          <small>点击右上角“上传款式”，支持一次选择多张图片。画布和素材库的历史内容不会出现在这里。</small>
+        </div>
+      `;
+      return;
+    }
+    els.ecommerceStyleGrid.innerHTML = assets.slice(0, 120).map((asset) => {
+      const selectedAsset = ecommerceStudio.selectedStyleIds.has(String(asset.id));
+      return `
+        <button class="ecommerce-style-card" type="button" data-ecommerce-style-id="${escapeHtml(asset.id)}" aria-pressed="${selectedAsset ? 'true' : 'false'}" aria-label="${selectedAsset ? '取消选择' : '选择'} ${escapeHtml(asset.title || '商品图')}">
+          <img src="${escapeHtml(asset.url)}" alt="" loading="lazy" />
+          <span>${escapeHtml(asset.title || '商品图')}</span>
+        </button>
+      `;
+    }).join('');
+    els.ecommerceStyleGrid.querySelectorAll('[data-ecommerce-style-id]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const id = String(button.dataset.ecommerceStyleId || '');
+        if (ecommerceStudio.selectedStyleIds.has(id)) ecommerceStudio.selectedStyleIds.delete(id);
+        else if (ecommerceStudio.selectedStyleIds.size >= 20) {
+          showToast('单批最多选择 20 款，请先移除部分款式。', 'warning');
+          return;
+        } else ecommerceStudio.selectedStyleIds.add(id);
+        renderEcommerceStudio();
+      });
+    });
+  }
+
+  function renderEcommerceModels() {
+    setPressedGroup('[data-ecommerce-model-group]', ecommerceStudio.modelGroup, 'ecommerceModelGroup');
+    const custom = ecommerceStudio.modelGroup === 'custom';
+    els.ecommerceCustomModelPanel.classList.toggle('hidden', !custom);
+    els.ecommerceModelGrid.classList.toggle('hidden', custom);
+    if (custom) return;
+    const models = ecommerceModels();
+    if (!models.length) {
+      els.ecommerceModelGrid.innerHTML = '<div class="ecommerce-empty-gallery">该分组暂无内置模特，请切换分组或使用自定义模特</div>';
+      return;
+    }
+    els.ecommerceModelGrid.innerHTML = models.map((model) => {
+      const active = String(model.id) === String(ecommerceStudio.modelPresetId);
+      const tags = Array.isArray(model.tags) ? model.tags.join(' · ') : '';
+      const name = model.display_name || model.id;
+      const imageUrl = model.image_url || model.image || '';
+      const gender = model.gender === 'male' ? 'male' : 'female';
+      const genderLabel = gender === 'male' ? '男' : '女';
+      return `
+        <article class="ecommerce-model-card" data-selected="${active ? 'true' : 'false'}" data-ecommerce-model-gender="${gender}">
+          <button class="ecommerce-model-preview" type="button" data-ecommerce-model-preview="${escapeHtml(model.id)}" aria-haspopup="dialog" aria-label="查看 ${escapeHtml(name)} 大图">
+            <img src="${escapeHtml(imageUrl)}" alt="${escapeHtml(name)}" loading="lazy" />
+            <span class="ecommerce-model-gender" aria-hidden="true">${genderLabel}</span>
+            <span class="ecommerce-preview-hint"><i class="ph ph-image" aria-hidden="true"></i><b>查看大图</b></span>
+          </button>
+          <button class="ecommerce-model-select" type="button" role="radio" data-ecommerce-model-id="${escapeHtml(model.id)}" aria-checked="${active ? 'true' : 'false'}" aria-label="选择模特 ${escapeHtml(name)}${tags ? `，${escapeHtml(tags)}` : ''}">
+            <span>${escapeHtml(name)}</span><i class="ph ph-check" aria-hidden="true"></i>
+          </button>
+        </article>
+      `;
+    }).join('');
+    els.ecommerceModelGrid.querySelectorAll('[data-ecommerce-model-preview]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const model = models.find((item) => String(item.id) === String(button.dataset.ecommerceModelPreview || ''));
+        if (model) openEcommerceImagePreview(model, button);
+      });
+    });
+    els.ecommerceModelGrid.querySelectorAll('[data-ecommerce-model-id]').forEach((button) => {
+      button.addEventListener('click', () => {
+        ecommerceStudio.modelPresetId = String(button.dataset.ecommerceModelId || '');
+        renderEcommerceModels();
+      });
+    });
+  }
+
+  function openEcommerceImagePreview(model, trigger = null, options = {}) {
+    if (!model || !els.ecommerceImagePreviewModal) return;
+    ecommercePreviewReturnFocus = trigger instanceof HTMLElement ? trigger : document.activeElement;
+    ecommercePreviewReturnTaskId = String(options.returnTaskId || '');
+    const selectable = options.selectable !== false;
+    ecommercePreviewModelId = selectable ? String(model.id || '') : '';
+    const name = String(model.display_name || model.id || '模特预览');
+    const tags = Array.isArray(model.tags) ? model.tags.filter(Boolean).join(' · ') : '';
+    els.ecommerceImagePreviewKicker.textContent = String(options.kicker || '模特大图');
+    els.ecommerceImagePreviewTitle.textContent = name;
+    els.ecommerceImagePreviewDescription.textContent = String(options.description || tags || '点击“选择此模特”后用于本批商品拍摄。');
+    els.ecommerceImagePreviewImage.src = String(model.image_url || model.image || '');
+    els.ecommerceImagePreviewImage.alt = `${name} 大图`;
+    els.ecommerceImagePreviewSelectBtn.classList.toggle('hidden', !selectable);
+    const selectLabel = els.ecommerceImagePreviewSelectBtn?.querySelector('span');
+    if (selectLabel) selectLabel.textContent = ecommercePreviewModelId === ecommerceStudio.modelPresetId ? '已选择，返回' : '选择此模特';
+    els.ecommerceStudioModal?.setAttribute('inert', '');
+    els.ecommerceStudioModal?.setAttribute('aria-hidden', 'true');
+    els.ecommerceImagePreviewModal.classList.remove('hidden');
+    requestAnimationFrame(() => els.ecommerceImagePreviewCloseBtn?.focus({ preventScroll: true }));
+  }
+
+  function closeEcommerceImagePreview() {
+    if (!els.ecommerceImagePreviewModal || els.ecommerceImagePreviewModal.classList.contains('hidden')) return;
+    els.ecommerceImagePreviewModal.classList.add('hidden');
+    els.ecommerceImagePreviewImage.removeAttribute('src');
+    els.ecommerceStudioModal?.removeAttribute('inert');
+    els.ecommerceStudioModal?.removeAttribute('aria-hidden');
+    ecommercePreviewModelId = '';
+    const returnFocus = ecommercePreviewReturnFocus;
+    const returnTaskId = ecommercePreviewReturnTaskId;
+    ecommercePreviewReturnFocus = null;
+    ecommercePreviewReturnTaskId = '';
+    const refreshedResult = returnTaskId
+      ? [...(els.ecommerceBatchItems?.querySelectorAll('[data-ecommerce-result-preview]') || [])]
+        .find((button) => String(button.dataset.ecommerceResultPreview || '') === returnTaskId)
+      : null;
+    const focusTarget = returnFocus?.isConnected ? returnFocus : (refreshedResult || els.ecommerceStudioCloseBtn);
+    if (focusTarget?.isConnected) requestAnimationFrame(() => focusTarget.focus({ preventScroll: true }));
+  }
+
+  function renderEcommerceEnvironment() {
+    setPressedGroup('[data-ecommerce-environment]', ecommerceStudio.environment, 'ecommerceEnvironment');
+    const outdoor = ecommerceStudio.environment === 'outdoor';
+    els.ecommerceWhitePanel?.classList.toggle('hidden', outdoor);
+    els.ecommerceOutdoorPanel.classList.toggle('hidden', !outdoor);
+    if (!outdoor) return;
+    const scenes = ecommerceScenes();
+    els.ecommerceSceneGrid.innerHTML = scenes.map((scene, index) => {
+      const active = !ecommerceStudio.customScene && String(scene.id) === String(ecommerceStudio.scenePresetId);
+      const previewIndex = Math.max(0, Math.min(5, Number(scene.preview_index ?? index) || 0));
+      return `
+        <button class="ecommerce-scene-card" type="button" data-ecommerce-scene-id="${escapeHtml(scene.id)}" aria-pressed="${active ? 'true' : 'false'}">
+          <span class="ecommerce-scene-thumb ecommerce-scene-preview-${previewIndex}" aria-hidden="true"></span>
+          <span class="ecommerce-scene-copy">
+            <strong>${escapeHtml(scene.name || scene.id)}</strong>
+            <small>${escapeHtml(scene.description || scene.prompt || '室外自然光拍摄')}</small>
+          </span>
+        </button>
+      `;
+    }).join('');
+    els.ecommerceSceneGrid.querySelectorAll('[data-ecommerce-scene-id]').forEach((button) => {
+      button.addEventListener('click', () => {
+        ecommerceStudio.customScene = false;
+        ecommerceStudio.scenePresetId = String(button.dataset.ecommerceSceneId || '');
+        renderEcommerceEnvironment();
+      });
+    });
+    els.ecommerceCustomSceneBtn.setAttribute('aria-pressed', ecommerceStudio.customScene ? 'true' : 'false');
+    els.ecommerceCustomScenePanel.classList.toggle('hidden', !ecommerceStudio.customScene);
+  }
+
+  function renderEcommerceTuneSummary() {
+    if (!els.ecommerceTuneSummary) return;
+    const shotLabels = { full: '全身', half: '半身', detail: '细节', back: '背面镜头' };
+    const poseLabels = {
+      auto: '自动姿势',
+      front: '正面站姿',
+      'three-quarter': '四分之三侧转',
+      side: '侧面站姿',
+      back: '背面站姿',
+      'weight-shift': '重心侧移',
+      walking: '自然行走',
+      'arms-open': '展袖站姿',
+      'turn-look': '转身回望'
+    };
+    els.ecommerceTuneSummary.textContent = `当前构图：${ecommerceStudio.ratio} · ${shotLabels[ecommerceStudio.shot] || '全身'} · ${poseLabels[ecommerceStudio.pose] || '自动姿势'}`;
+  }
+
+  function normalizeEcommerceTask(item) {
+    return item?.task && typeof item.task === 'object' ? item.task : (item || {});
+  }
+
+  function ecommerceBatchTasks(payload = ecommerceStudio.batch) {
+    const source = payload?.tasks || payload?.items || payload?.batch?.tasks || payload?.batch?.items || [];
+    return Array.isArray(source) ? source.map(normalizeEcommerceTask) : [];
+  }
+
+  function ecommerceBatchId(payload = ecommerceStudio.batch) {
+    return String(payload?.batch?.id || payload?.batch_id || payload?.id || '');
+  }
+
+  function ecommerceBatchCanvasId(payload = ecommerceStudio.batch) {
+    return String(payload?.batch?.canvas_id || payload?.canvas_id || '');
+  }
+
+  function ecommerceBatchCreatedAt(payload = ecommerceStudio.batch) {
+    return Number(payload?.batch?.created_at || payload?.created_at || 0);
+  }
+
+  function ecommerceBatchProductAssetIds(payload = ecommerceStudio.batch) {
+    return ecommerceBatchTasks(payload)
+      .map((task) => String(task?.product_asset_id || ''))
+      .filter(Boolean);
+  }
+
+  function ecommerceBatchStatus(payload = ecommerceStudio.batch) {
+    const tasks = ecommerceBatchTasks(payload);
+    if (tasks.length && tasks.every((task) => ['succeeded', 'failed'].includes(task.status))) {
+      if (tasks.every((task) => task.status === 'succeeded')) return 'succeeded';
+      if (tasks.every((task) => task.status === 'failed')) return 'failed';
+      return 'partial';
+    }
+    return String(payload?.batch?.status || payload?.status || 'running').toLowerCase();
+  }
+
+  function ecommerceBatchTerminal(payload = ecommerceStudio.batch) {
+    return ['succeeded', 'failed', 'partial', 'completed'].includes(ecommerceBatchStatus(payload));
+  }
+
+  function rememberEcommerceBackgroundBatch(payload) {
+    const batchId = ecommerceBatchId(payload);
+    if (!batchId) return;
+    ecommerceBackgroundBatches.set(batchId, payload);
+    renderEcommerceTaskBadge();
+  }
+
+  function ecommerceBatchesForCanvas(canvasId = currentCanvas?.id || '') {
+    const target = String(canvasId || '');
+    return [...ecommerceBackgroundBatches.values()]
+      .filter((payload) => ecommerceBatchCanvasId(payload) === target)
+      .sort((left, right) => ecommerceBatchCreatedAt(right) - ecommerceBatchCreatedAt(left));
+  }
+
+  function renderEcommerceTaskBadge() {
+    if (!els.ecommerceTaskBadge || !els.ecommerceBtn) return;
+    const batches = [...ecommerceBackgroundBatches.values()];
+    const active = batches.filter((payload) => !ecommerceBatchTerminal(payload));
+    const completed = batches.filter((payload) => ecommerceBatchTerminal(payload) && !ecommerceReviewedBatchIds.has(ecommerceBatchId(payload)));
+    const badge = els.ecommerceTaskBadge;
+    badge.classList.toggle('hidden', !active.length && !completed.length);
+    badge.dataset.tone = active.length ? 'running' : 'complete';
+    badge.textContent = active.length ? `${active.length}` : (completed.length ? '完成' : '');
+    const statusText = active.length
+      ? `${active.length} 个后台拍摄批次进行中`
+      : (completed.length ? `${completed.length} 个拍摄批次已完成` : '');
+    els.ecommerceBtn.setAttribute('aria-label', statusText ? `电商拍摄，${statusText}` : '电商拍摄');
+    els.ecommerceBtn.title = statusText || '电商拍摄';
+  }
+
+  function attachEcommerceBatchForCanvas(canvasId = currentCanvas?.id || '') {
+    const latest = ecommerceBatchesForCanvas(canvasId)[0] || null;
+    if (!latest) return null;
+    ecommerceStudio.batch = latest;
+    ecommerceStudio.submittedAssetIds = ecommerceBatchProductAssetIds(latest);
+    return latest;
+  }
+
+  function ecommerceTaskUrl(task) {
+    const result = task?.result || task?.output || {};
+    const url = findUrl(result);
+    if (url) return url;
+    const b64 = findBase64(result);
+    return b64 ? `data:image/png;base64,${b64}` : '';
+  }
+
+  function ecommerceTaskStatusLabel(status) {
+    return ({ queued: '排队中', running: '拍摄中', succeeded: '已完成', failed: '失败' })[status] || '准备中';
+  }
+
+  function renderEcommerceBatch() {
+    const payload = ecommerceStudio.batch;
+    els.ecommerceBatchPanel.classList.toggle('hidden', !payload);
+    if (!payload) return;
+    const tasks = ecommerceBatchTasks(payload);
+    const status = ecommerceBatchStatus(payload);
+    const terminal = ecommerceBatchTerminal(payload);
+    els.ecommerceBatchPanel.classList.toggle('is-terminal', terminal);
+    els.ecommerceNewBatchBtn.classList.toggle('hidden', !terminal);
+    const succeeded = tasks.filter((task) => task.status === 'succeeded').length;
+    const failed = tasks.filter((task) => task.status === 'failed').length;
+    els.ecommerceBatchTitle.textContent = terminal ? (failed ? '拍摄已结束' : '拍摄完成') : '正在拍摄';
+    els.ecommerceBatchSummary.textContent = `${succeeded} 张完成 · ${failed} 张失败 · ${Math.max(0, tasks.length - succeeded - failed)} 张处理中`;
+    const fallbackCount = ecommerceStudio.submittedAssetIds.length;
+    const rows = tasks.length ? tasks : Array.from({ length: fallbackCount }, (_, index) => ({ id: `pending-${index}`, status: 'queued' }));
+    els.ecommerceBatchItems.innerHTML = rows.map((task, index) => {
+      const source = ecommerceAssetById(ecommerceStudio.submittedAssetIds[index]);
+      const url = ecommerceTaskUrl(task);
+      const taskId = String(task.id || task.task_id || `${ecommerceBatchId(payload)}-${index}`);
+      const nodeId = ecommerceStudio.insertedNodeIds.get(taskId) || '';
+      const error = task.status === 'failed' ? String(task.error || task.message || '生成失败，请查看运行日志') : '';
+      const sourceTitle = source?.title || `款式 ${index + 1}`;
+      const thumbnailUrl = url || source?.url || '';
+      return `
+        <article class="ecommerce-batch-item">
+          ${url ? `
+            <button class="ecommerce-batch-thumb" type="button" data-ecommerce-result-preview="${escapeHtml(taskId)}" aria-haspopup="dialog" aria-controls="ecommerceImagePreviewModal" aria-label="查看 ${escapeHtml(sourceTitle)} 拍摄结果大图" title="查看大图">
+              <img src="${escapeHtml(url)}" alt="${escapeHtml(sourceTitle)} 拍摄结果" />
+              <span class="ecommerce-batch-preview-hint" aria-hidden="true"><i class="ph ph-arrows-out"></i></span>
+            </button>
+          ` : `<div class="ecommerce-batch-thumb"><img src="${escapeHtml(thumbnailUrl)}" alt="${escapeHtml(sourceTitle)}" /></div>`}
+          <div class="ecommerce-batch-info">
+            <strong>${escapeHtml(sourceTitle)}</strong>
+            <span class="ecommerce-batch-status ${escapeHtml(task.status || '')}"${error ? ` title="${escapeHtml(error)}"` : ''}>${escapeHtml(error || ecommerceTaskStatusLabel(task.status))}</span>
+          </div>
+          <div class="ecommerce-batch-actions">
+            ${url ? `<button type="button" data-ecommerce-edit="${escapeHtml(url)}" data-ecommerce-edit-node="${escapeHtml(nodeId)}" aria-label="编辑图片" title="本地微调"><i class="ph ph-pencil-simple" aria-hidden="true"></i></button><button type="button" data-ecommerce-download="${escapeHtml(url)}" aria-label="下载图片" title="下载图片"><i class="ph ph-download-simple" aria-hidden="true"></i></button>` : ''}
+          </div>
+        </article>
+      `;
+    }).join('');
+    els.ecommerceBatchItems.querySelectorAll('[data-ecommerce-result-preview]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const taskId = String(button.dataset.ecommerceResultPreview || '');
+        const index = rows.findIndex((task, rowIndex) => String(task.id || task.task_id || `${ecommerceBatchId(payload)}-${rowIndex}`) === taskId);
+        const task = index >= 0 ? rows[index] : null;
+        const url = ecommerceTaskUrl(task);
+        if (!url) return;
+        const source = ecommerceAssetById(ecommerceStudio.submittedAssetIds[index]);
+        const title = source?.title || `款式 ${index + 1}`;
+        openEcommerceImagePreview({
+          id: taskId,
+          display_name: `${title} · 拍摄结果`,
+          image_url: url
+        }, button, {
+          selectable: false,
+          kicker: '拍摄结果',
+          description: '这是本批生成结果的大图预览；关闭后可继续本地微调或下载原图。',
+          returnTaskId: taskId
+        });
+      });
+    });
+    els.ecommerceBatchItems.querySelectorAll('[data-ecommerce-edit]').forEach((button) => {
+      button.addEventListener('click', () => openMediaPreview(button.dataset.ecommerceEdit || '', button.dataset.ecommerceEditNode || ''));
+    });
+    els.ecommerceBatchItems.querySelectorAll('[data-ecommerce-download]').forEach((button) => {
+      button.addEventListener('click', () => downloadMedia(button.dataset.ecommerceDownload || ''));
+    });
+    if (terminal && status === 'failed') els.ecommerceReadyHint.textContent = '全部生成失败，具体原因已显示在任务中';
+  }
+
+  function renderEcommerceStudio() {
+    if (!els.ecommerceStudioModal) return;
+    ensureEcommerceDefaults();
+    renderEcommerceStyles();
+    renderEcommerceModels();
+    renderEcommerceEnvironment();
+    setPressedGroup('[data-ecommerce-ratio]', ecommerceStudio.ratio, 'ecommerceRatio');
+    setPressedGroup('[data-ecommerce-shot]', ecommerceStudio.shot, 'ecommerceShot');
+    setPressedGroup('[data-ecommerce-pose]', ecommerceStudio.pose, 'ecommercePose');
+    renderEcommerceTuneSummary();
+    renderEcommerceBatch();
+    const count = ecommerceStudio.selectedStyleIds.size;
+    const cost = count * ecommerceImageCost();
+    const problem = ecommercePrerequisite(count);
+    els.ecommerceEstimate.textContent = `${count} 款 · 预计 ${cost} 点`;
+    els.ecommerceReadyHint.textContent = problem || `将生成 ${count} 张 ${ecommerceStudio.environment === 'white' ? '白底棚拍' : '室外拍摄'}图`;
+    els.ecommerceGenerateBtn.disabled = !!problem;
+    els.ecommerceTrialBtn.classList.toggle('hidden', count <= 5);
+    els.ecommerceTrialBtn.disabled = !!ecommercePrerequisite(1);
+    const uploadDisabled = ecommerceStudio.uploading || ecommerceStudio.selectedStyleIds.size >= 20;
+    els.ecommerceFileInput.disabled = uploadDisabled;
+    els.ecommerceUploadBtn.setAttribute('aria-disabled', uploadDisabled ? 'true' : 'false');
+    els.ecommerceUploadBtn.classList.toggle('is-disabled', uploadDisabled);
+    els.ecommerceUploadBtn.setAttribute('aria-busy', ecommerceStudio.uploading ? 'true' : 'false');
+    const generateLabel = els.ecommerceGenerateBtn.querySelector('span');
+    if (generateLabel) generateLabel.textContent = ecommerceStudio.submitting ? '正在提交…' : '开始拍摄';
+    els.ecommerceUploadLabel.innerHTML = ecommerceStudio.uploading
+      ? '<i class="ph ph-spinner-gap" aria-hidden="true"></i>正在上传'
+      : '<i class="ph ph-upload-simple" aria-hidden="true"></i>上传款式';
+  }
+
+  async function openEcommerceStudio() {
+    if (!currentCanvas || !currentProject) throw new Error('请先打开一个画布');
+    const canvasId = String(currentCanvas.id || '');
+    if (ecommerceStudio.sessionCanvasId !== canvasId) resetEcommerceStudioSession(canvasId);
+    const restoredBatch = attachEcommerceBatchForCanvas(canvasId);
+    if (restoredBatch && ecommerceBatchTerminal(restoredBatch)) {
+      ecommerceReviewedBatchIds.add(ecommerceBatchId(restoredBatch));
+      renderEcommerceTaskBadge();
+    }
+    ecommerceReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    els.ecommerceBtn?.setAttribute('aria-expanded', 'true');
+    els.ecommerceBtn?.classList.add('active');
+    els.ecommerceStudioModal.classList.remove('hidden');
+    ecommerceStudio.catalogLoading = !ecommerceStudio.catalog;
+    renderEcommerceStudio();
+    requestAnimationFrame(() => els.ecommerceStudioCloseBtn.focus({ preventScroll: true }));
+    try {
+      if (!ecommerceStudio.catalog) ecommerceStudio.catalog = await api('/api/ecommerce/catalog');
+      ecommerceStudio.catalogLoading = false;
+      ensureEcommerceDefaults();
+      renderEcommerceStudio();
+    } catch (error) {
+      ecommerceStudio.catalogLoading = false;
+      renderEcommerceStudio();
+      throw error;
+    }
+  }
+
+  function closeEcommerceStudio() {
+    if (!els.ecommerceStudioModal || ecommerceStudio.submitting || ecommerceStudio.uploading) return;
+    closeEcommerceImagePreview();
+    els.ecommerceStudioModal.classList.add('hidden');
+    els.ecommerceBtn?.setAttribute('aria-expanded', 'false');
+    els.ecommerceBtn?.classList.remove('active');
+    const returnFocus = ecommerceReturnFocus;
+    ecommerceReturnFocus = null;
+    if (returnFocus?.isConnected) requestAnimationFrame(() => returnFocus.focus({ preventScroll: true }));
+  }
+
+  async function uploadEcommerceStyles(files) {
+    const available = Math.max(0, 20 - ecommerceStudio.selectedStyleIds.size);
+    const selectedFiles = [...(files || [])].filter((file) => String(file.type || '').startsWith('image/')).slice(0, available);
+    if (!selectedFiles.length) {
+      showToast(available ? '请选择有效的图片文件。' : '单批最多选择 20 款。', 'warning');
+      return;
+    }
+    ecommerceStudio.uploading = true;
+    renderEcommerceStudio();
+    const projectId = String(currentProject?.id || '');
+    const canvasId = String(ecommerceStudio.sessionCanvasId || currentCanvas?.id || '');
+    let uploaded = 0;
+    const failures = [];
+    try {
+      for (const file of selectedFiles) {
+        try {
+          const body = new FormData();
+          body.append('file', file);
+          const data = await api(`/api/uploads?project_id=${encodeURIComponent(projectId)}&canvas_id=${encodeURIComponent(canvasId)}`, { method: 'POST', body });
+          if (data.asset?.id) {
+            const assetId = String(data.asset.id);
+            ecommerceStudio.sessionStyleIds.add(assetId);
+            ecommerceStudio.sessionAssets.set(assetId, data.asset);
+            ecommerceStudio.selectedStyleIds.add(assetId);
+          }
+          uploaded += 1;
+        } catch (error) {
+          failures.push(`${file.name}: ${error?.message || '上传失败'}`);
+        }
+      }
+      await loadAssets();
+      if (uploaded) showToast(`已上传并选中 ${uploaded} 款商品图。`, 'success');
+      if (failures.length) showToast(`有 ${failures.length} 张上传失败：${failures[0]}`, 'error');
+    } finally {
+      ecommerceStudio.uploading = false;
+      renderEcommerceStudio();
+    }
+  }
+
+  function ecommerceBatchRequest(assetIds) {
+    const modelPresetId = ecommerceStudio.modelGroup === 'custom' ? '' : ecommerceStudio.modelPresetId;
+    const customModelPrompt = ecommerceStudio.modelGroup === 'custom' ? ecommerceStudio.customModelPrompt.trim() : '';
+    const items = assetIds.map((productAssetId) => ({
+      product_asset_id: productAssetId,
+      ...(modelPresetId ? { model_preset_id: modelPresetId } : {}),
+      ...(customModelPrompt ? { custom_model_prompt: customModelPrompt } : {}),
+      environment: ecommerceStudio.environment,
+      ...(ecommerceStudio.environment === 'outdoor' && !ecommerceStudio.customScene ? { scene_preset_id: ecommerceStudio.scenePresetId } : {}),
+      ...(ecommerceStudio.environment === 'outdoor' && ecommerceStudio.customScene ? { custom_scene_prompt: ecommerceStudio.customScenePrompt.trim() } : {}),
+      shot: ecommerceStudio.shot,
+      pose: ecommerceStudio.pose === 'auto' ? '' : ecommerceStudio.pose,
+      ratio: ecommerceStudio.ratio,
+      image_size: '2K'
+    }));
+    return {
+      client_request_id: uid('shoot'),
+      canvas_id: ecommerceStudio.sessionCanvasId || currentCanvas?.id || undefined,
+      items
+    };
+  }
+
+  async function insertEcommerceResults(payload) {
+    const targetCanvasId = ecommerceBatchCanvasId(payload);
+    if (!targetCanvasId || String(currentCanvas?.id || '') !== targetCanvasId) return;
+    const tasks = ecommerceBatchTasks(payload);
+    let inserted = 0;
+    const recoveredAssetIds = ecommerceBatchProductAssetIds(payload);
+    const sourceAssetIds = recoveredAssetIds.length ? recoveredAssetIds : ecommerceStudio.submittedAssetIds;
+    const origin = ecommerceStudio.sessionCanvasId === targetCanvasId && ecommerceStudio.outputOrigin
+      ? ecommerceStudio.outputOrigin
+      : centerWorldPoint();
+    tasks.forEach((task, index) => {
+      if (task.status !== 'succeeded') return;
+      const url = ecommerceTaskUrl(task);
+      if (!url) return;
+      const taskId = String(task.id || task.task_id || `${ecommerceBatchId(payload)}-${index}`);
+      const existingNode = state.nodes.find((node) => String(node.taskId || '') === taskId);
+      if (existingNode) {
+        ecommerceStudio.insertedTaskIds.add(taskId);
+        ecommerceStudio.insertedNodeIds.set(taskId, existingNode.id);
+        return;
+      }
+      if (ecommerceStudio.insertedTaskIds.has(taskId)) return;
+      const source = ecommerceAssetById(sourceAssetIds[index]);
+      const node = addNode('image', {
+        x: origin.x + (index % 4) * 560,
+        y: origin.y + Math.floor(index / 4) * 820,
+        title: `${source?.title || `款式 ${index + 1}`} · 电商拍摄`,
+        prompt: 'AI 电商拍摄批次生成结果',
+        ratio: ecommerceStudio.ratio,
+        imageSize: '2K',
+        resultUrl: url,
+        resultKind: 'image',
+        status: 'succeeded',
+        progress: 100,
+        taskId
+      });
+      ecommerceStudio.insertedTaskIds.add(taskId);
+      ecommerceStudio.insertedNodeIds.set(taskId, node.id);
+      inserted += 1;
+    });
+    if (!inserted) return;
+    addLog({ level: 'success', title: '电商拍摄结果已加入画布', detail: `${inserted} 张图片，可双击或点击“本地微调”继续编辑` });
+    await saveCanvas({ silent: true });
+    await loadAssets().catch(() => {});
+  }
+
+  async function applyEcommerceBatchPayload(payload, options = {}) {
+    const batchId = ecommerceBatchId(payload);
+    if (!batchId) return;
+    const previous = ecommerceBackgroundBatches.get(batchId) || null;
+    rememberEcommerceBackgroundBatch(payload);
+    const targetCanvasId = ecommerceBatchCanvasId(payload);
+    const shouldAttach = options.attach !== false && ecommerceStudio.sessionCanvasId === targetCanvasId;
+    if (shouldAttach) {
+      ecommerceStudio.batch = payload;
+      const productAssetIds = ecommerceBatchProductAssetIds(payload);
+      if (productAssetIds.length) ecommerceStudio.submittedAssetIds = productAssetIds;
+    }
+    if (Number.isFinite(Number(payload?.balance))) updateAccount({ ...me, credits: Number(payload.balance) });
+    await insertEcommerceResults(payload);
+    const justCompleted = previous && !ecommerceBatchTerminal(previous) && ecommerceBatchTerminal(payload);
+    if (justCompleted && options.notify !== false) {
+      const failed = ecommerceBatchTasks(payload).filter((task) => task.status === 'failed').length;
+      const onTargetCanvas = String(currentCanvas?.id || '') === targetCanvasId;
+      showToast(
+        failed
+          ? `后台拍摄已结束：${failed} 张失败，可打开“电商拍摄”查看详情。`
+          : `后台拍摄已完成${onTargetCanvas ? '，结果已加入当前画布。' : '，结果已保存，返回原画布即可查看。'}`,
+        failed ? 'warning' : 'success'
+      );
+      addLog({
+        level: failed ? 'warning' : 'success',
+        title: failed ? '后台拍摄已结束' : '后台拍摄已完成',
+        detail: failed ? `${failed} 张生成失败，打开电商拍摄查看详情` : '结果已保存到素材库，并仅写入任务所属画布'
+      });
+    }
+    if (shouldAttach) renderEcommerceStudio();
+    renderEcommerceTaskBadge();
+  }
+
+  function scheduleEcommercePoll(delay = 1600) {
+    window.clearTimeout(ecommercePollTimer);
+    const active = [...ecommerceBackgroundBatches.values()].some((payload) => !ecommerceBatchTerminal(payload));
+    if (!active) return;
+    ecommercePollTimer = window.setTimeout(() => pollEcommerceBatch().catch(() => {}), delay);
+  }
+
+  async function pollEcommerceBatch() {
+    if (ecommercePollInFlight) return;
+    const active = [...ecommerceBackgroundBatches.values()].filter((payload) => !ecommerceBatchTerminal(payload));
+    if (!active.length) return;
+    ecommercePollInFlight = true;
+    try {
+      const settled = await Promise.allSettled(active.map(async (batch) => {
+        const batchId = ecommerceBatchId(batch);
+        const payload = await api(`/api/ecommerce/batches/${encodeURIComponent(batchId)}`);
+        await applyEcommerceBatchPayload(payload);
+      }));
+      const rejected = settled.find((entry) => entry.status === 'rejected');
+      if (rejected) throw rejected.reason;
+      ecommerceStudio.pollFailures = 0;
+    } catch (error) {
+      ecommerceStudio.pollFailures += 1;
+      addLog({ level: 'warning', title: '拍摄进度同步暂停', detail: error?.message || '网络暂不可用，将自动重试' });
+    } finally {
+      ecommercePollInFlight = false;
+      scheduleEcommercePoll(ecommerceStudio.pollFailures
+        ? Math.min(8000, 1600 * (ecommerceStudio.pollFailures + 1))
+        : 1600);
+    }
+  }
+
+  async function recoverEcommerceBackgroundBatches(canvasId = currentCanvas?.id || '') {
+    const targetCanvasId = String(canvasId || '');
+    const requests = [api('/api/ecommerce/batches?active_only=true&limit=20')];
+    if (targetCanvasId) requests.push(api(`/api/ecommerce/batches?canvas_id=${encodeURIComponent(targetCanvasId)}&limit=1`));
+    const responses = await Promise.all(requests);
+    const recovered = responses.flatMap((response) => Array.isArray(response?.batches) ? response.batches : []);
+    recovered.forEach(rememberEcommerceBackgroundBatch);
+    const latest = ecommerceBatchesForCanvas(targetCanvasId)[0] || null;
+    if (latest) {
+      if (ecommerceStudio.sessionCanvasId === targetCanvasId) attachEcommerceBatchForCanvas(targetCanvasId);
+      await insertEcommerceResults(latest);
+      if (ecommerceStudio.sessionCanvasId === targetCanvasId) renderEcommerceStudio();
+    }
+    renderEcommerceTaskBadge();
+    scheduleEcommercePoll();
+  }
+
+  async function submitEcommerceBatch(trial = false) {
+    const allIds = [...ecommerceStudio.selectedStyleIds];
+    const ids = trial ? allIds.slice(0, 1) : allIds;
+    const problem = ecommercePrerequisite(ids.length);
+    if (problem) {
+      showToast(problem, 'warning');
+      return;
+    }
+    ecommerceStudio.submitting = true;
+    ecommerceStudio.submittedAssetIds = ids;
+    ecommerceStudio.insertedTaskIds = new Set();
+    ecommerceStudio.insertedNodeIds = new Map();
+    ecommerceStudio.outputOrigin = centerWorldPoint();
+    renderEcommerceStudio();
+    try {
+      const requestPayload = ecommerceBatchRequest(ids);
+      const payload = await api('/api/ecommerce/batches', {
+        method: 'POST',
+        body: JSON.stringify(requestPayload)
+      });
+      if (!ecommerceBatchId(payload)) throw new Error('服务未返回拍摄批次编号，请稍后重试');
+      ecommerceStudio.submitting = false;
+      await applyEcommerceBatchPayload(payload);
+      addLog({ level: 'info', title: trial ? '试拍任务已提交' : '电商拍摄已提交', detail: `${ids.length} 款 · 预计 ${ids.length * ecommerceImageCost()} 点` });
+      closeEcommerceStudio();
+      showToast(`已转入后台拍摄 ${ids.length} 款，可继续使用画布。`, 'success');
+      scheduleEcommercePoll(700);
+    } catch (error) {
+      ecommerceStudio.submitting = false;
+      renderEcommerceStudio();
+      throw error;
+    }
+  }
+
+  function resetEcommerceBatch() {
+    window.clearTimeout(ecommercePollTimer);
+    const batchId = ecommerceBatchId();
+    if (batchId && ecommerceBatchTerminal(ecommerceStudio.batch)) {
+      ecommerceBackgroundBatches.delete(batchId);
+      ecommerceReviewedBatchIds.delete(batchId);
+    }
+    ecommerceStudio.batch = null;
+    ecommerceStudio.submittedAssetIds = [];
+    ecommerceStudio.insertedTaskIds = new Set();
+    ecommerceStudio.insertedNodeIds = new Map();
+    ecommerceStudio.outputOrigin = null;
+    ecommerceStudio.pollFailures = 0;
+    renderEcommerceTaskBadge();
+    renderEcommerceStudio();
+  }
+
   function assetSourceLabel(asset) {
     if (asset.source === 'upload') return '上传素材';
     if (asset.source === 'task') return '生成结果';
@@ -5650,7 +6448,88 @@
         const action = button.dataset.dockAction;
         if (action === 'upload') els.fileInput.click();
         if (action === 'assets') showAssetPage().catch(showError);
+        if (action === 'ecommerce') openEcommerceStudio().catch(showError);
       });
+    });
+    document.querySelectorAll('[data-ecommerce-model-group]').forEach((button) => {
+      button.addEventListener('click', () => {
+        ecommerceStudio.modelGroup = button.dataset.ecommerceModelGroup || 'domestic';
+        ensureEcommerceDefaults();
+        renderEcommerceStudio();
+      });
+    });
+    document.querySelectorAll('[data-ecommerce-environment]').forEach((button) => {
+      button.addEventListener('click', () => {
+        ecommerceStudio.environment = button.dataset.ecommerceEnvironment || 'white';
+        renderEcommerceStudio();
+      });
+    });
+    document.querySelectorAll('[data-ecommerce-ratio]').forEach((button) => {
+      button.addEventListener('click', () => {
+        ecommerceStudio.ratio = button.dataset.ecommerceRatio || '3:4';
+        setPressedGroup('[data-ecommerce-ratio]', ecommerceStudio.ratio, 'ecommerceRatio');
+        renderEcommerceTuneSummary();
+      });
+    });
+    document.querySelectorAll('[data-ecommerce-shot]').forEach((button) => {
+      button.addEventListener('click', () => {
+        ecommerceStudio.shot = button.dataset.ecommerceShot || 'full';
+        setPressedGroup('[data-ecommerce-shot]', ecommerceStudio.shot, 'ecommerceShot');
+        renderEcommerceTuneSummary();
+      });
+    });
+    document.querySelectorAll('[data-ecommerce-pose]').forEach((button) => {
+      button.addEventListener('click', () => {
+        ecommerceStudio.pose = button.dataset.ecommercePose || 'auto';
+        setPressedGroup('[data-ecommerce-pose]', ecommerceStudio.pose, 'ecommercePose');
+        renderEcommerceTuneSummary();
+      });
+    });
+    els.ecommerceCustomSceneBtn?.addEventListener('click', () => {
+      ecommerceStudio.customScene = !ecommerceStudio.customScene;
+      renderEcommerceStudio();
+      if (ecommerceStudio.customScene) requestAnimationFrame(() => els.ecommerceCustomScenePrompt.focus({ preventScroll: true }));
+    });
+    els.ecommerceCustomModelPrompt?.addEventListener('input', () => {
+      ecommerceStudio.customModelPrompt = els.ecommerceCustomModelPrompt.value;
+      renderEcommerceStudio();
+    });
+    els.ecommerceCustomScenePrompt?.addEventListener('input', () => {
+      ecommerceStudio.customScenePrompt = els.ecommerceCustomScenePrompt.value;
+      renderEcommerceStudio();
+    });
+    els.ecommerceFileInput?.addEventListener('change', () => {
+      const files = [...(els.ecommerceFileInput.files || [])];
+      els.ecommerceFileInput.value = '';
+      uploadEcommerceStyles(files).catch(showError);
+    });
+    els.ecommerceImagePreviewCloseBtn?.addEventListener('click', closeEcommerceImagePreview);
+    els.ecommerceWhiteExampleBtn?.addEventListener('click', () => {
+      openEcommerceImagePreview({
+        id: 'white-studio-example',
+        display_name: '标准纯白棚拍',
+        image_url: '/static/ecommerce/scenes/white-studio-example.png',
+        tags: ['纯白无缝背景', '柔和正面光', '全身商品展示']
+      }, els.ecommerceWhiteExampleBtn, {
+        selectable: false,
+        kicker: '白底案例',
+        description: '纯白无缝背景、柔和正面光与完整全身构图的效果示例；实际生成会保留所选款式的颜色、纹理和版型。'
+      });
+    });
+    els.ecommerceImagePreviewSelectBtn?.addEventListener('click', () => {
+      if (ecommercePreviewModelId) ecommerceStudio.modelPresetId = ecommercePreviewModelId;
+      closeEcommerceImagePreview();
+      renderEcommerceModels();
+    });
+    els.ecommerceImagePreviewModal?.addEventListener('click', (event) => {
+      if (event.target === els.ecommerceImagePreviewModal) closeEcommerceImagePreview();
+    });
+    els.ecommerceGenerateBtn?.addEventListener('click', () => submitEcommerceBatch(false).catch(showError));
+    els.ecommerceTrialBtn?.addEventListener('click', () => submitEcommerceBatch(true).catch(showError));
+    els.ecommerceNewBatchBtn?.addEventListener('click', resetEcommerceBatch);
+    els.ecommerceStudioCloseBtn?.addEventListener('click', closeEcommerceStudio);
+    els.ecommerceStudioModal?.addEventListener('click', (event) => {
+      if (event.target === els.ecommerceStudioModal) closeEcommerceStudio();
     });
     els.addMenu.querySelectorAll('[data-add-menu]').forEach((button) => {
       button.addEventListener('click', (event) => {
@@ -5871,7 +6750,9 @@
     els.passwordChangeForm?.addEventListener('submit', submitPasswordChange);
     window.addEventListener('popstate', applyRouteFromLocation);
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') refreshGenerationCapabilities().catch(() => {});
+      if (document.visibilityState !== 'visible') return;
+      refreshGenerationCapabilities().catch(() => {});
+      recoverEcommerceBackgroundBatches(currentCanvas?.id || '').catch(() => {});
     });
     window.addEventListener('keydown', (event) => {
       if (mediaEditor && !els.mediaPreviewModal.classList.contains('hidden')) {
@@ -5909,6 +6790,48 @@
             els.mediaEditorDiscardDialog.classList.add('hidden');
             els.mediaEditorStage.focus({ preventScroll: true });
           } else requestCloseMediaEditor();
+        }
+        return;
+      }
+      if (els.ecommerceImagePreviewModal && !els.ecommerceImagePreviewModal.classList.contains('hidden')) {
+        if (event.key === 'Tab') {
+          const focusable = [...els.ecommerceImagePreviewModal.querySelectorAll('button:not(:disabled),[tabindex]:not([tabindex="-1"])')]
+            .filter((element) => element.offsetParent !== null);
+          if (focusable.length) {
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+              event.preventDefault();
+              last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+              event.preventDefault();
+              first.focus();
+            }
+          }
+        } else if (event.key === 'Escape' && !event.isComposing) {
+          event.preventDefault();
+          closeEcommerceImagePreview();
+        }
+        return;
+      }
+      if (els.ecommerceStudioModal && !els.ecommerceStudioModal.classList.contains('hidden')) {
+        if (event.key === 'Tab') {
+          const focusable = [...els.ecommerceStudioModal.querySelectorAll('button:not(:disabled),textarea:not(:disabled),input:not(:disabled),a[href],[tabindex]:not([tabindex="-1"])')]
+            .filter((element) => element.offsetParent !== null);
+          if (focusable.length) {
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+              event.preventDefault();
+              last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+              event.preventDefault();
+              first.focus();
+            }
+          }
+        } else if (event.key === 'Escape') {
+          event.preventDefault();
+          closeEcommerceStudio();
         }
         return;
       }

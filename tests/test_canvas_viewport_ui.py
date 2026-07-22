@@ -175,7 +175,7 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("canvas-create-dock", html)
         self.assertIn('data-dock-add="prompt"', html)
         self.assertIn('data-dock-add="image"', html)
-        self.assertIn('data-dock-action="assets"', html)
+        self.assertIn('data-dock-action="ecommerce"', html)
         self.assertIn("document.querySelectorAll('[data-dock-add]')", js)
         self.assertIn("document.querySelectorAll('[data-dock-action]')", js)
         self.assertIn("node-type-icon", js)
@@ -1217,6 +1217,15 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn(".workspace-menu", css)
         self.assertIn('id="projectCurrentName"', html)
         self.assertIn('id="canvasCurrentName"', html)
+        hidden_project_menu = '<div class="workspace-menu project-workspace-menu hidden" hidden aria-hidden="true">'
+        self.assertIn(hidden_project_menu, html)
+        hidden_project_start = html.index(hidden_project_menu)
+        hidden_project_end = html.index('</div>', hidden_project_start)
+        self.assertIn('id="projectCurrentName"', html[hidden_project_start:hidden_project_end])
+        self.assertEqual(
+            len(re.findall(r'<div class="workspace-menu(?! project-workspace-menu hidden")', html)),
+            1,
+        )
 
         self.assertIn("function revealMinimap", js)
         self.assertIn("minimap-active", js)
@@ -1616,7 +1625,7 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertRegex(floating_css, r"\.toolbar-shell\s*\{[^}]*display:\s*flex")
         self.assertRegex(
             floating_css,
-            r"\.canvas-create-dock\s*\{[^}]*position:\s*static;[^}]*width:\s*100%;[^}]*min-height:\s*58px;[^}]*grid-template-columns:\s*repeat\(6,\s*minmax\(56px,\s*1fr\)\);[^}]*transform:\s*none;",
+            r"\.canvas-create-dock\s*\{[^}]*position:\s*static;[^}]*width:\s*100%;[^}]*min-height:\s*58px;[^}]*grid-template-columns:\s*repeat\(5,\s*minmax\(56px,\s*1fr\)\);[^}]*transform:\s*none;",
         )
         dock_block = re.search(r"\.canvas-create-dock\s*\{(?P<body>[^}]*)\}", floating_css, re.S)
         self.assertIsNotNone(dock_block)
@@ -1714,15 +1723,22 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("els.saveBtn.addEventListener('click'", (ROOT / "static" / "app.js").read_text(encoding="utf-8"))
         self.assertIn("document.addEventListener('visibilitychange'", (ROOT / "static" / "app.js").read_text(encoding="utf-8"))
 
-    def test_all_entrypoints_use_the_qa_cache_version(self):
-        version = "20260721-editor-discard2"
+    def test_all_entrypoints_use_the_performance_cache_version(self):
+        version = "20260723-performance1"
+        legacy_version = "20260722-ecommerce-composition4"
         for page in ["index.html", "auth.html", "admin.html"]:
             with self.subTest(page=page):
                 html = (ROOT / "static" / page).read_text(encoding="utf-8")
+                static_versions = re.findall(r'/static/[^"\']+\?v=([^"\']+)', html)
+                self.assertTrue(static_versions)
+                self.assertEqual({version}, set(static_versions))
+                self.assertNotIn(legacy_version, html)
                 self.assertIn(f"/static/vendor/phosphor/phosphor.css?v={version}", html)
                 self.assertIn(f"/static/app.css?v={version}", html)
         index_html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
+        admin_html = (ROOT / "static" / "admin.html").read_text(encoding="utf-8")
         self.assertIn(f"/static/app.js?v={version}", index_html)
+        self.assertIn(f"/static/admin.js?v={version}", admin_html)
 
     def test_yunzhi_brand_name_and_ip_are_consistent_across_entrypoints(self):
         pages = {
@@ -1734,11 +1750,50 @@ class CanvasViewportUiTests(unittest.TestCase):
                 self.assertIn("云芝画布", html)
                 self.assertNotIn("云知画布", html)
 
-        self.assertIn('/static/brand/yunzhi-ip.png', pages["auth.html"])
-        for page in ["index.html", "auth.html", "admin.html"]:
-            self.assertIn('/static/brand/yunzhi-avatar.png', pages[page])
+        version = "20260723-performance1"
+        self.assertIn(f'/static/brand/yunzhi-ip.webp?v={version}', pages["auth.html"])
+        for page in ["index.html", "auth.html"]:
+            self.assertIn(f'/static/brand/yunzhi-avatar.webp?v={version}', pages[page])
+            self.assertNotIn('/static/brand/yunzhi-avatar.png', pages[page])
+        self.assertNotIn('/static/brand/yunzhi-ip.png', pages["auth.html"])
+        self.assertIn('/static/brand/yunzhi-avatar.png', pages["admin.html"])
         self.assertIn('class="empty-hint-avatar brand-avatar-shell"', pages["index.html"])
         self.assertIn("云芝陪你开始创作", pages["index.html"])
+
+    def test_optimized_brand_images_declare_stable_first_paint_dimensions(self):
+        version = "20260723-performance1"
+        pages = {
+            page: (ROOT / "static" / page).read_text(encoding="utf-8")
+            for page in ["index.html", "auth.html"]
+        }
+        avatar_counts = {"index.html": 2, "auth.html": 1}
+        for page, expected_count in avatar_counts.items():
+            tags = re.findall(
+                rf'<img\b[^>]*src="/static/brand/yunzhi-avatar\.webp\?v={version}"[^>]*>',
+                pages[page],
+            )
+            self.assertEqual(expected_count, len(tags), page)
+            for tag in tags:
+                self.assertIn('width="256"', tag)
+                self.assertIn('height="256"', tag)
+                self.assertIn('decoding="async"', tag)
+                self.assertIn('loading="eager"', tag)
+                self.assertNotIn('loading="lazy"', tag)
+
+        ip_tag = re.search(
+            rf'<img\b[^>]*src="/static/brand/yunzhi-ip\.webp\?v={version}"[^>]*>',
+            pages["auth.html"],
+        )
+        self.assertIsNotNone(ip_tag)
+        for attribute in [
+            'width="1448"',
+            'height="1086"',
+            'decoding="async"',
+            'loading="eager"',
+            'fetchpriority="high"',
+        ]:
+            self.assertIn(attribute, ip_tag.group(0))
+        self.assertNotIn('loading="lazy"', ip_tag.group(0))
 
     def test_admin_provider_settings_are_scoped_masked_and_responsive(self):
         html = (ROOT / "static" / "admin.html").read_text(encoding="utf-8")
@@ -2015,7 +2070,7 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("@media (prefers-contrast: more)", final_css)
         self.assertIn("outline: 3px solid var(--system-blue)", final_css)
 
-        version = "20260721-editor-discard2"
+        version = "20260723-performance1"
         index_html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
         self.assertIn(f'/static/vendor/phosphor/phosphor.css?v={version}', index_html)
         self.assertIn(f'/static/app.css?v={version}', index_html)
@@ -2312,14 +2367,14 @@ class CanvasViewportUiTests(unittest.TestCase):
         self.assertIn("spaceDown = false", blur_handler)
         self.assertIn("endPointerAction({ type: 'pointercancel' })", blur_handler)
 
-    def test_narrow_dock_keeps_all_six_actions_reachable(self):
+    def test_narrow_dock_keeps_all_five_actions_reachable(self):
         html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
         css = (ROOT / "static" / "app.css").read_text(encoding="utf-8")
         final_css = css.split("/* Approved bright silver glass system, 2026-07-10. */", 1)[1]
         dock = html[html.index('class="canvas-create-dock"'):html.index('id="addMenu"')]
         narrow = final_css[final_css.index("@media (max-width: 760px)"):final_css.index("@media (prefers-reduced-motion: reduce)")]
 
-        self.assertEqual(len(re.findall(r"data-dock-(?:add|action)=", dock)), 6)
+        self.assertEqual(len(re.findall(r"data-dock-(?:add|action)=", dock)), 5)
         self.assertRegex(narrow, r"\.canvas-create-dock\s*\{[^}]*grid-template-columns:\s*repeat\(3,")
         self.assertRegex(narrow, r"\.canvas-create-dock\s+button\s*\{[^}]*min-height:\s*56px")
 
@@ -2380,7 +2435,7 @@ class CanvasViewportUiTests(unittest.TestCase):
         html = (ROOT / "static" / "index.html").read_text(encoding="utf-8")
         js = (ROOT / "static" / "app.js").read_text(encoding="utf-8")
 
-        for element_id in ["assetBtn", "logBtn", "themeToggleBtn", "accountBtn"]:
+        for element_id in ["ecommerceBtn", "assetBtn", "logBtn", "themeToggleBtn", "accountBtn"]:
             self.assertRegex(html, rf'<button[^>]*id="{element_id}"[^>]*aria-label="[^"]+"')
         apply_theme = js[js.index("function applyTheme(theme, options = {})"):js.index("function toggleTheme()")]
         self.assertIn("themeToggleBtn.setAttribute('aria-label'", apply_theme)

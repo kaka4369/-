@@ -1,0 +1,165 @@
+{
+  "version": 2,
+  "models": [
+    {
+      "id": "domestic-01",
+      "group": "domestic",
+      "gender": "female",
+      "display_name": "国内女模 01",
+      "tags": ["女性", "高盘发", "清爽", "全身"],
+      "image": "/static/ecommerce/models/domestic-01.png"
+    },
+    {
+      "id": "domestic-02",
+      "group": "domestic",
+      "gender": "female",
+      "display_name": "国内女模 02",
+      "tags": ["女性", "短发", "知性", "全身"],
+      "image": "/static/ecommerce/models/domestic-02.png"
+    },
+    {
+      "id": "domestic-03",
+      "group": "domestic",
+      "gender": "female",
+      "display_name": "国内女模 03",
+      "tags": ["女性", "束发", "利落", "全身"],
+      "image": "/static/ecommerce/models/domestic-03.png"
+    },
+    {
+      "id": "domestic-04",
+      "group": "domestic",
+      "gender": "female",
+      "display_name": "国内女模 04",
+      "tags": ["女性", "低盘发", "柔和", "全身"],
+      "image": "/static/ecommerce/models/domestic-04.png"
+    },
+    {
+      "id": "domestic-05",
+      "group": "domestic",
+      "gender": "female",
+      "display_name": "国内女模 05",
+      "tags": ["女性", "直短发", "简约", "全身"],
+      "image": "/static/ecommerce/models/domestic-05.png"
+    },
+    {
+      "id": "domestic-06",
+      "group": "domestic",
+      "gender": "male",
+      "display_name": "国内男模 01",
+      "tags": ["男性", "短发", "清爽", "全身"],
+      "image": "/static/ecommerce/models/domestic-male-01.png"
+    },
+    {
+      "id": "domestic-07",
+      "group": "domestic",
+      "gender": "male",
+      "display_name": "国内男模 02",
+      "tags": ["男性", "短发", "成熟", "全身"],
+      "image": "/static/ecommerce/models/domestic-male-02.png"
+    },
+    {
+      "id": "domestic-08",
+      "group": "domestic",
+      "gender": "male",
+      "display_name": "国内男模 03",
+      "tags": ["男性", "利落短发", "干练", "全身"],
+      "image": "/static/ecommerce/models/domestic-male-03.png"
+    },
+    {
+      "id": "domestic-09",
+      "group": "domestic",
+      "gender": "male",
+      "display_name": "国内男模 04",
+      "tags": ["男性", "微卷短发", "自然", "全身"],
+      "image": "/static/ecommerce/models/domestic-male-04.png"
+    },
+    {
+      "id": "domestic-10",
+      "group": "domestic",
+      "gender": "male",
+      "display_name": "国内男模 05",
+      "tags": ["男性", "清爽短发", "年轻", "全身"],
+      "image": "/static/ecommerce/models/domestic-male-05.png"
+    },
+    {
+      "id": "international-01",
+      "group": "international",
+      "gender": "female",
+      "display_name": "国际女模 01",
+      "tags": ["女性", "欧洲裔", "清冷", "全身"],
+      "image": "/static/ecommerce/models/international-01.png"
+    },
+    {
+      "id": "international-02",
+      "group": "international",
+      "gender": "female",
+      "display_name": "国际女模 02",
+      "tags": ["女性", "非洲裔", "束发", "全身"],
+      "image": "/static/ecommerce/models/international-02.png"
+    },
+    {
+      "id": "international-03",
+      "group": "international",
+      "gender": "female",
+      "display_name": "国际女模 03",
+      "tags": ["女性", "南亚裔", "束发", "全身"],
+      "image": "/static/ecommerce/models/international-03.png"
+    },
+    {
+      "id": "international-04",
+      "group": "international",
+      "gender": "female",
+      "display_name": "国际女模 04",
+      "tags": ["女性", "拉丁裔", "优雅", "全身"],
+      "image": "/static/ecommerce/models/international-04.png"
+    },
+    {
+      "id": "international-05",
+      "group": "international",
+      "gender": "female",
+      "display_name": "国际女模 05",
+      "tags": ["女性", "中东裔", "简约", "全身"],
+      "image": "/static/ecommerce/models/international-05.png"
+    },
+    {
+      "id": "international-06",
+      "group": "international",
+      "gender": "male",
+      "display_name": "国际男模 01",
+      "tags": ["男性", "欧洲裔", "清爽", "全身"],
+      "image": "/static/ecommerce/models/international-male-01.png"
+    },
+    {
+      "id": "international-07",
+      "group": "international",
+      "gender": "male",
+      "display_name": "国际男模 02",
+      "tags": ["男性", "非洲裔", "成熟", "全身"],
+      "image": "/static/ecommerce/models/international-male-02.png"
+    },
+    {
+      "id": "international-08",
+      "group": "international",
+      "gender": "male",
+      "display_name": "国际男模 03",
+      "tags": ["男性", "南亚裔", "干练", "全身"],
+      "image": "/static/ecommerce/models/international-male-03.png"
+    },
+    {
+      "id": "international-09",
+      "group": "international",
+      "gender": "male",
+      "display_name": "国际男模 04",
+      "tags": ["男性", "拉丁裔", "自然", "全身"],
+      "image": "/static/ecommerce/models/international-male-04.png"
+    },
+    {
+      "id": "international-10",
+      "group": "international",
+      "gender": "male",
+      "display_name": "国际男模 05",
+      "tags": ["男性", "中东裔", "年轻", "全身"],
+      "image": "/static/ecommerce/models/international-male-05.png"
+    }
+  ]
+}
